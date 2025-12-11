@@ -1,0 +1,45 @@
+import { useMutation } from '@tanstack/react-query';
+import client from '../../../api/client';
+
+export interface FilterItem {
+  dimension: string;
+  op: '=' | '!=' | '>' | '<' | '>=' | '<=' | 'IN';
+  value: any;
+}
+
+export interface SemanticQueryRequest {
+  metrics: string[];
+  dimensions: string[];
+  filters: FilterItem[];
+}
+
+export interface SemanticQueryResponse {
+  sql: string;
+  columns: string[];
+  rows: any[];
+  generated_at: string;
+  error: string | null;
+}
+
+export const runSemanticQuery = async (req: SemanticQueryRequest): Promise<SemanticQueryResponse> => {
+  const res = await client.post('/api/query/semantic', req);
+  return res.data;
+};
+
+export const useSemanticQuery = () => {
+  return useMutation({
+    mutationFn: runSemanticQuery,
+  });
+};
+
+export const generateSqlOnly = async (req: SemanticQueryRequest): Promise<{ sql: string; generated_at: string }> => {
+  const res = await client.post('/api/query/semantic/sql-only', req);
+  return res.data;
+};
+
+export const useSqlOnly = () => {
+  return useMutation({
+    mutationFn: generateSqlOnly,
+  });
+};
+

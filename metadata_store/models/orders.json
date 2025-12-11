@@ -1,0 +1,62 @@
+{
+  "model": "orders",
+  "metrics": [
+    {
+      "name": "order_count",
+      "expression": "COUNT(*)",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_amount",
+      "expression": "SUM(amount)",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    }
+  ],
+  "dimensions": [
+    "id",
+    "customer_id",
+    "amount",
+    "status"
+  ],
+  "filters": [],
+  "source_tables": [
+    "raw_orders"
+  ],
+  "entity": {
+    "name": "orders",
+    "pk": "id",
+    "columns": [
+      "id",
+      "customer_id",
+      "amount",
+      "status",
+      "order_count",
+      "total_amount"
+    ]
+  },
+  "relationships": []
+}

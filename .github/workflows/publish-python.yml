@@ -1,0 +1,27 @@
+name: Publish Python
+on:
+  release:
+    types: [created]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      
+      - run: pip install build twine
+
+      - name: Build Backend
+        run: python -m build backend
+
+      - name: Build CLI
+        run: python -m build axi-cli
+
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: twine upload backend/dist/* axi-cli/dist/*

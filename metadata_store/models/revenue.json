@@ -1,0 +1,49 @@
+{
+  "model": "revenue",
+  "metrics": [
+    {
+      "name": "mrr",
+      "expression": "SUM(o.amount)",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    }
+  ],
+  "dimensions": [
+    "c.region"
+  ],
+  "filters": [
+    "o.status = 'active'"
+  ],
+  "source_tables": [
+    "orders",
+    "customers"
+  ],
+  "entity": {
+    "name": "revenue",
+    "pk": null,
+    "columns": [
+      "region",
+      "mrr"
+    ]
+  },
+  "relationships": [
+    {
+      "parent_model": "customers",
+      "child_model": "orders",
+      "fk_column": "customer_id",
+      "pk_column": "id",
+      "join_type": "INNER"
+    }
+  ]
+}

@@ -1,0 +1,212 @@
+{
+  "generated_at": "2025-12-09T21:26:04.866333Z",
+  "entities": [
+    {
+      "name": "customers",
+      "model": "customers",
+      "description": "Entity derived from model customers",
+      "attributes": [],
+      "metrics": [],
+      "relationships": [
+        {
+          "source_entity": "customers",
+          "target_entity": "orders",
+          "type": "INNER",
+          "source_key": "id",
+          "target_key": "customer_id",
+          "description": "INNER relationship from customers to orders"
+        }
+      ],
+      "tags": []
+    },
+    {
+      "name": "orders",
+      "model": "orders",
+      "description": "Entity derived from model orders",
+      "attributes": [
+        {
+          "name": "id",
+          "data_type": "unknown",
+          "description": null,
+          "is_pk": false,
+          "is_fk": false,
+          "source_column": "id",
+          "tags": []
+        },
+        {
+          "name": "customer_id",
+          "data_type": "unknown",
+          "description": null,
+          "is_pk": false,
+          "is_fk": false,
+          "source_column": "customer_id",
+          "tags": []
+        },
+        {
+          "name": "amount",
+          "data_type": "unknown",
+          "description": null,
+          "is_pk": false,
+          "is_fk": false,
+          "source_column": "amount",
+          "tags": []
+        },
+        {
+          "name": "status",
+          "data_type": "unknown",
+          "description": null,
+          "is_pk": false,
+          "is_fk": false,
+          "source_column": "status",
+          "tags": []
+        }
+      ],
+      "metrics": [
+        "order_count",
+        "total_amount"
+      ],
+      "relationships": [],
+      "tags": []
+    },
+    {
+      "name": "revenue",
+      "model": "revenue",
+      "description": "Entity derived from model revenue",
+      "attributes": [
+        {
+          "name": "c.region",
+          "data_type": "unknown",
+          "description": null,
+          "is_pk": false,
+          "is_fk": false,
+          "source_column": "c.region",
+          "tags": []
+        }
+      ],
+      "metrics": [
+        "mrr"
+      ],
+      "relationships": [],
+      "tags": []
+    }
+  ],
+  "metrics": [
+    {
+      "name": "order_count",
+      "expression": "COUNT(*)",
+      "metric_type": "aggregate",
+      "dimensions": [
+        "id",
+        "customer_id",
+        "amount",
+        "status"
+      ],
+      "description": "",
+      "default_filters": [],
+      "grain": "unknown",
+      "tags": [],
+      "sources": [
+        "raw_orders"
+      ]
+    },
+    {
+      "name": "total_amount",
+      "expression": "SUM(amount)",
+      "metric_type": "aggregate",
+      "dimensions": [
+        "id",
+        "customer_id",
+        "amount",
+        "status"
+      ],
+      "description": "",
+      "default_filters": [],
+      "grain": "unknown",
+      "tags": [],
+      "sources": [
+        "raw_orders"
+      ]
+    },
+    {
+      "name": "mrr",
+      "expression": "SUM(o.amount)",
+      "metric_type": "aggregate",
+      "dimensions": [
+        "c.region"
+      ],
+      "description": "",
+      "default_filters": [],
+      "grain": "unknown",
+      "tags": [],
+      "sources": [
+        "orders"
+      ]
+    }
+  ],
+  "dimensions": [
+    {
+      "name": "id",
+      "data_type": "unknown",
+      "attributes": [],
+      "related_metrics": [
+        "order_count",
+        "total_amount"
+      ],
+      "description": "Dimension extracted from orders",
+      "tags": []
+    },
+    {
+      "name": "customer_id",
+      "data_type": "unknown",
+      "attributes": [],
+      "related_metrics": [
+        "order_count",
+        "total_amount"
+      ],
+      "description": "Dimension extracted from orders",
+      "tags": []
+    },
+    {
+      "name": "amount",
+      "data_type": "unknown",
+      "attributes": [],
+      "related_metrics": [
+        "order_count",
+        "total_amount"
+      ],
+      "description": "Dimension extracted from orders",
+      "tags": []
+    },
+    {
+      "name": "status",
+      "data_type": "unknown",
+      "attributes": [],
+      "related_metrics": [
+        "order_count",
+        "total_amount"
+      ],
+      "description": "Dimension extracted from orders",
+      "tags": []
+    },
+    {
+      "name": "c.region",
+      "data_type": "unknown",
+      "attributes": [],
+      "related_metrics": [
+        "mrr"
+      ],
+      "description": "Dimension extracted from revenue",
+      "tags": []
+    }
+  ],
+  "relationships": [
+    {
+      "source_entity": "customers",
+      "target_entity": "orders",
+      "type": "INNER",
+      "source_key": "id",
+      "target_key": "customer_id",
+      "description": "INNER relationship from customers to orders"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "model": "customers",
+  "metrics": [],
+  "dimensions": [],
+  "filters": [],
+  "source_tables": [
+    "raw_customers"
+  ],
+  "entity": {
+    "name": "customers",
+    "pk": "id",
+    "columns": [
+      "id",
+      "region"
+    ]
+  },
+  "relationships": []
+}

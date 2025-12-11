@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+sqlglot
+pydantic
+pyyaml
+snowflake-connector-python
