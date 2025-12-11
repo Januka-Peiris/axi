@@ -1,51 +1,22 @@
 AXI: The Open Source Semantic Layer
-SQL → Metrics · Dimensions · Entities · Relationships · Glossary · Semantic SQL
+SQL -> Metrics | Dimensions | Entities | Relationships | Glossary | Semantic SQL
 
-AXI is a headless, open-source semantic layer that turns your SQL models into business-ready concepts—metrics, dimensions, entities, relationships, and a complete business glossary—and then generates optimized, join-aware SQL for any downstream tool.
+AXI is a headless, open-source semantic layer that turns SQL models into business-ready concepts (metrics, dimensions, entities, relationships, and a business glossary) and generates optimized, join-aware SQL for any downstream tool. It is warehouse-native, dbt-aware, Snowflake-friendly, and requires zero DSL.
 
-It is lightweight, warehouse-native, dbt-aware, and requires zero DSL.
-Just SQL → semantics.
+## Why AXI
+- Repeated SQL logic across BI tools, notebooks, and apps.
+- Metric inconsistency between teams.
+- No single semantic truth across dbt models and BI definitions.
 
-🚀 Why AXI?
+## What AXI Does
+- Extracts metrics, dimensions, entities, relationships, filters, tags, and descriptions from SQL.
+- Infers join paths and generates optimized, join-aware SQL (Snowflake-aware).
+- Builds a business glossary and materialized semantic marts with caching.
+- Integrates deeply with dbt Core and ships a Semantic Explorer UI.
+- Result: define once, query everywhere.
 
-Modern data teams face three persistent problems:
-
-1. Rewriting the same SQL logic everywhere
-
-JOINs, filters, CASE expressions, window logic, aggregations… repeated in BI tools, notebooks, and production apps.
-
-2. Metric inconsistency
-
-Every team calculates metrics slightly differently → misalignment and constant rework.
-
-3. No central semantic truth
-
-dbt models define tables, not meaning.
-BI tools define metrics, not models.
-No unified layer exists across the stack.
-
-🧠 How AXI Solves This
-
-AXI creates a semantic layer directly from your SQL:
-
-Extracts metrics, dimensions, entities, relationships
-
-Automatically infers join paths
-
-Generates optimized SQL (Snowflake-aware)
-
-Builds a business glossary for all concepts
-
-Provides caching + materialized semantic marts
-
-Integrates deeply with dbt Core
-
-Includes a full Semantic Explorer UI
-
-The result:
-Define once. Query everywhere.
-
-🏗️ Architecture
+## Architecture
+```
 graph LR
     DW[(Warehouse\nSnowflake/PG)] --> AXI[AXI Core\nSemantic Engine]
     AXI --> API[FastAPI Server]
@@ -54,245 +25,54 @@ graph LR
     API --> BI[BI Tools]
     API --> NB[Notebooks]
     AXI --> Docs[Glossary & Semantic Output]
+```
 
-⚡ Quick Start
-1. Install AXI CLI
-pip install axi-cli
+## Quick Start
+1) Install the CLI
+`pip install axi-cli`
 
-2. Run the Demo Project
-
-AXI ships with a full demo you can run instantly:
-
-# 1. Extract demo project
+2) Run the demo project
+```
 axi extract examples/demo
-
-# 2. Inspect available metrics
 axi metrics list
-
-# 3. Run a semantic query (no SQL needed)
 axi query --metric total_revenue --dims customer_id
-
-# 4. Launch the Semantic Explorer UI
 axi ui
-
-
-Then open:
-
-http://localhost:5173
-
-✨ Features
-🔍 Semantic Extraction (from SQL—no DSL)
-
-AXI automatically extracts:
-
-Metrics
-
-Dimensions
-
-Grain
-
-Entities
-
-Relationships
-
-Filters
-
-Tags
-
-Descriptions
-
-📊 Advanced Metrics Layer
-
-Supports:
-
-Simple metrics
-
-Ratios (safe division with TRY_DIVIDE)
-
-Semi-additive metrics
-
-Derived metrics
-
-Time intelligence:
-
-Previous Period
-
-Rolling windows
-
-To-date measures
-
-🧭 Semantic Query Engine
-
-Join-aware SQL generation:
-
-axi query --metric mrr --dims customers.region
-
-
-AXI automatically finds the join graph and generates:
-
-Optimized JOINs
-
-Group-by logic
-
-Snowflake-specific SQL (IFF, TRY_DIVIDE, QUALIFY)
-
-🧱 dbt Integration
-
-Loads manifest.json
-
-Ingests models, sources, tests
-
-Extracts constraints from unique/not_null tests
-
-Enhances semantic graph with dbt lineage
-
-❄️ Deep Snowflake Integration
-
-Table + column metadata
-
-Constraints (PK/FK)
-
-Tags
-
-Masking + row access policies
-
-Lineage from ACCOUNT_USAGE
-
-Snowflake-optimized SQL generation
-
-📚 Business Glossary
-
-Generates a complete glossary of:
-
-Entities
-
-Attributes
-
-Metrics
-
-Dimensions
-
-Relationships
-
-All derived from SQL + dbt metadata.
-
-🚀 Caching & Materialized Semantic Marts
-
-Query caching
-
-Materialized metric tables
-
-Multi-metric marts
-
-Full + incremental refresh
-
-🖥️ Semantic Explorer UI
-
-Modern React UI for:
-
-Metrics
-
-Dimensions
-
-Entities
-
-Models
-
-Semantic Graph
-
-Glossary
-
-SQL preview
-
-Query runner
-
-🆚 Comparison
-Feature	AXI	dbt Metrics	LookML
-Open Source	✅	⚠️ Deprecated	❌
-Headless	✅	⚠️ Limited	❌
-Auto-JOINs	✅	❌	✅
-SQL-first	✅	❌	❌ DSL
-Glossary	✅	❌	⚠️ Basic
-Time Intelligence	✅	⚠️	⚠️
-Caching + Marts	✅	❌	❌
-Snowflake Integration	🔥	⚠️	⚠️
-📁 Project Structure
-backend/        Semantic Engine (BSL)
-axi-cli/        CLI Tools (MIT)
-frontend/       UI (MIT)
-examples/       Demo Project
-docker/         Docker Compose Support
-
-🐳 Run with Docker
+```
+Then open http://localhost:5173.
+
+## Feature Highlights
+- Semantic extraction (no DSL): metrics, dimensions, grain, entities, relationships, filters, tags, descriptions.
+- Metrics layer: simple, ratios (safe TRY_DIVIDE), semi-additive, derived, time intelligence (previous period, rolling, to-date).
+- Semantic query engine: join-aware SQL generation (`axi query --metric mrr --dims customers.region`), optimized JOINs, group-by logic, Snowflake SQL (IFF, TRY_DIVIDE, QUALIFY).
+- dbt integration: loads manifest.json, ingests models/sources/tests, extracts constraints from unique/not_null, enriches the semantic graph with lineage.
+- Snowflake integration: table/column metadata, PK/FK constraints, tags, masking/row access policies, ACCOUNT_USAGE lineage, Snowflake-optimized SQL.
+- Business glossary: entities, attributes, metrics, dimensions, relationships derived from SQL plus dbt metadata.
+- Caching and semantic marts: query caching, materialized metric tables, multi-metric marts, full and incremental refresh.
+- Semantic Explorer UI: React UI for metrics, dimensions, entities, models, semantic graph, glossary, SQL preview, and query runner.
+
+## Project Structure
+- backend/  - Semantic Engine (BSL)
+- axi-cli/  - CLI tools (MIT)
+- frontend/ - UI (MIT)
+- examples/ - Demo project
+- docker/   - Docker Compose support
+
+## Run with Docker
+```
 docker-compose up --build
+```
+Starts API (FastAPI), UI (Vite/React), and demo metadata.
 
+## Documentation
+Documentation lives in a separate repo: https://github.com/your-org/axi-docs
+(Hosted site link coming soon.)
 
-Starts:
+## AXI Cloud
+Managed AXI with multi-tenant projects, environments (dev/staging/prod), scheduled refresh, snapshotting, semantic and warehouse lineage, query caching, semantic marts, and SSO/RBAC. Cloud runs AXI OSS under the hood.
 
-API (FastAPI)
+## Contributing
+We welcome contributions. See CONTRIBUTING.md.
 
-UI (Vite/React)
-
-Demo metadata
-
-📘 Documentation
-
-Documentation lives in a separate repo:
-👉 https://github.com/your-org/axi-docs
-
-(Hosted site link coming soon)
-
-🌩️ AXI Cloud
-
-A fully managed version of AXI offering:
-
-Multi-tenant project management
-
-Environments (dev/staging/prod)
-
-Scheduled refresh
-
-Snapshotting
-
-Lineage (semantic + warehouse)
-
-Query caching
-
-Semantic marts
-
-SSO + RBAC
-
-Cloud runs AXI OSS under the hood—battle-tested, scalable, opinionated.
-
-🤝 Contributing
-
-We welcome contributions from the community.
-See: CONTRIBUTING.md
-
-📜 Licensing
-
-AXI uses a dual-license structure:
-
-Backend (axi-semantic)
-
-Licensed under Business Source License (BSL 1.1).
-This allows:
-
-Free use
-
-Commercial use
-
-Modification
-
-Redistribution
-
-But prohibits offering AXI as a cloud-hosted service that competes with AXI Cloud.
-
-Automatic Change Date: 2027-01-01
-After that date, the backend becomes MIT.
-
-CLI, UI, Examples, Docs
-
-Licensed under MIT for maximum community adoption.
-
-See the respective LICENSE files for exact terms.
+## Licensing
+- Backend (axi-semantic): Business Source License (BSL 1.1). Free/commercial use, modification, redistribution; prohibits offering AXI as a competing hosted service. Automatic Change Date: 2027-01-01 (becomes MIT afterward).
+- CLI, UI, examples, docs: MIT. See respective LICENSE files for terms.

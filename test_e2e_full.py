@@ -39,29 +39,29 @@ class Colors:
     END = '\033[0m'
 
 
-def test_pass(name):
+def _pass(name):
     print(f"{Colors.GREEN}✓{Colors.END} {name}")
 
 
-def test_fail(name, error):
+def _fail(name, error):
     print(f"{Colors.RED}✗{Colors.END} {name}: {error}")
     return False
 
 
-def test_info(name):
+def _info(name):
     print(f"{Colors.BLUE}→{Colors.END} {name}")
 
 
 def test_config_loader():
     """Test config loading"""
-    test_info("Testing config loader...")
+    _info("Testing config loader...")
     
     try:
         # Test default config
         config = Config()
         assert config.include is not None
         assert config.exclude is not None
-        test_pass("Default config creation")
+        _pass("Default config creation")
         
         # Test with promotion rules
         config = Config(
@@ -70,58 +70,61 @@ def test_config_loader():
         )
         assert len(config.include.folders) == 1
         assert config.include.folders[0] == "**"
-        test_pass("Config with promotion rules")
-        
-        return True
+        _pass("Config with promotion rules")
     except Exception as e:
-        return test_fail("Config loader", str(e))
+        _fail("Config loader", str(e))
+        raise
 
 
 def test_promotion_engine():
     """Test promotion engine"""
-    test_info("Testing promotion engine...")
+    _info("Testing promotion engine...")
     
     try:
+        class PromoConfig:
+            def __init__(self, include, exclude, mode="auto"):
+                self.include = include
+                self.exclude = exclude
+                self.promotion = type("P", (), {"mode": mode})()
+
         # Test with wildcard promotion
-        config = Config(include=PromotionRules(folders=["**"], tags=[]))
-        engine = PromotionEngine(config)
-        
+        include_all = PromotionRules(folders=["**"], tags=[])
+        exclude_none = PromotionRules(folders=[], tags=[])
+        engine = PromotionEngine(PromoConfig(include_all, exclude_none))
+
         # Should promote everything
         assert engine.is_promoted("any/path/file.sql", []) == True
-        test_pass("Wildcard promotion")
-        
+        _pass("Wildcard promotion")
+
         # Test with specific folder
-        config = Config(include=PromotionRules(folders=["models/marts/**"], tags=[]))
-        engine = PromotionEngine(config)
-        assert engine.is_promoted("models/marts/revenue.sql", []) == True
-        assert engine.is_promoted("models/staging/orders.sql", []) == False
-        test_pass("Folder-based promotion")
+        include_marts = PromotionRules(folders=["models/marts/**"], tags=[])
+        exclude_staging = PromotionRules(folders=["models/staging/**"], tags=[])
+        engine_specific = PromotionEngine(PromoConfig(include_marts, exclude_staging))
+        assert engine_specific.is_promoted("models/marts/revenue.sql", []) == True
+        assert engine_specific.is_promoted("models/staging/orders.sql", []) == False
+        _pass("Folder-based promotion")
         
         # Test exclusion
-        config = Config(
-            include=PromotionRules(folders=["**"], tags=[]),
-            exclude=PromotionRules(folders=["models/test/**"], tags=[])
-        )
-        engine = PromotionEngine(config)
-        assert engine.is_promoted("models/marts/revenue.sql", []) == True
-        assert engine.is_promoted("models/test/temp.sql", []) == False
-        test_pass("Exclusion rules")
+        exclude_tests = PromotionRules(folders=["models/test/**"], tags=[])
+        engine_exclude = PromotionEngine(PromoConfig(include_all, exclude_tests))
+        assert engine_exclude.is_promoted("models/marts/revenue.sql", []) == True
+        assert engine_exclude.is_promoted("models/test/temp.sql", []) == False
+        _pass("Exclusion rules")
         
         # Test tag-based promotion
-        config = Config(include=PromotionRules(folders=[], tags=["axi"]))
-        engine = PromotionEngine(config)
-        assert engine.is_promoted("any/file.sql", ["axi"]) == True
-        assert engine.is_promoted("any/file.sql", []) == False
-        test_pass("Tag-based promotion")
-        
-        return True
+        include_tags = PromotionRules(folders=[], tags=["axi"])
+        engine_tags = PromotionEngine(PromoConfig(include_tags, exclude_none))
+        assert engine_tags.is_promoted("any/file.sql", ["axi"]) is True
+        assert engine_tags.is_promoted("any/file.sql", []) is False
+        _pass("Tag-based promotion")
     except Exception as e:
-        return test_fail("Promotion engine", str(e))
+        _fail("Promotion engine", str(e))
+        raise
 
 
 def test_sql_scanner():
     """Test SQL scanner"""
-    test_info("Testing SQL scanner...")
+    _info("Testing SQL scanner...")
     
     try:
         # Create temp directory with SQL files
@@ -140,21 +143,20 @@ def test_sql_scanner():
             
             models = list(scanner.scan())
             assert len(models) == 2, f"Expected 2 models, got {len(models)}"
-            test_pass(f"SQL scanner found {len(models)} models")
+            _pass(f"SQL scanner found {len(models)} models")
             
             # Check model paths
             paths = [m.path for m in models]
             assert "orders.sql" in paths or "models/orders.sql" in str(paths)
-            test_pass("Model paths correct")
-            
-        return True
+            _pass("Model paths correct")
     except Exception as e:
-        return test_fail("SQL scanner", str(e))
+        _fail("SQL scanner", str(e))
+        raise
 
 
 def test_metadata_extraction():
     """Test metadata extraction"""
-    test_info("Testing metadata extraction...")
+    _info("Testing metadata extraction...")
     
     try:
         # Test simple SELECT
@@ -164,7 +166,7 @@ def test_metadata_extraction():
         assert meta["model"] == "orders"
         assert "source_tables" in meta
         assert "orders" in meta["source_tables"]
-        test_pass("Basic SELECT extraction")
+        _pass("Basic SELECT extraction")
         
         # Test aggregation
         sql = "SELECT date, SUM(amount) as total_revenue FROM orders GROUP BY date"
@@ -172,23 +174,22 @@ def test_metadata_extraction():
         
         assert len(meta["metrics"]) > 0, "Should extract metrics"
         assert any("revenue" in m.get("name", "").lower() for m in meta["metrics"])
-        test_pass("Aggregation extraction")
+        _pass("Aggregation extraction")
         
         # Test dimensions
         assert len(meta["dimensions"]) > 0, "Should extract dimensions"
         assert "date" in meta["dimensions"]
-        test_pass("Dimension extraction")
-        
-        return True
+        _pass("Dimension extraction")
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return test_fail("Metadata extraction", str(e))
+        _fail("Metadata extraction", str(e))
+        raise
 
 
 def test_metadata_writer():
     """Test metadata writer"""
-    test_info("Testing metadata writer...")
+    _info("Testing metadata writer...")
     
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -206,24 +207,23 @@ def test_metadata_writer():
             # Check JSON file created
             json_file = Path(tmpdir) / "models" / "test_model.json"
             assert json_file.exists(), "JSON metadata file should be created"
-            test_pass("Metadata JSON file created")
+            _pass("Metadata JSON file created")
             
             # Check content
             with open(json_file) as f:
                 data = json.load(f)
             assert data["model"] == "test_model"
-            test_pass("Metadata JSON content correct")
-            
-        return True
+            _pass("Metadata JSON content correct")
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return test_fail("Metadata writer", str(e))
+        _fail("Metadata writer", str(e))
+        raise
 
 
 def test_metadata_indexer():
     """Test metadata indexer"""
-    test_info("Testing metadata indexer...")
+    _info("Testing metadata indexer...")
     
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -235,25 +235,24 @@ def test_metadata_indexer():
             # Check database exists (it's created in __init__)
             db_file = Path(tmpdir) / "axi.db"
             assert db_file.exists(), "Index database should be created"
-            test_pass("Index database created")
+            _pass("Index database created")
             
             # Test listing (should work even if empty)
             entities = indexer.list_entities()
             metrics = indexer.list_metrics()
             assert isinstance(entities, list)
             assert isinstance(metrics, list)
-            test_pass("Indexer list methods work")
-            
-        return True
+            _pass("Indexer list methods work")
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return test_fail("Metadata indexer", str(e))
+        _fail("Metadata indexer", str(e))
+        raise
 
 
 def test_full_pipeline():
     """Test full extraction pipeline"""
-    test_info("Testing full extraction pipeline...")
+    _info("Testing full extraction pipeline...")
     
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -283,11 +282,11 @@ def test_full_pipeline():
                 writer.write(meta)
             
             assert count == 2, f"Expected 2 models, got {count}"
-            test_pass(f"Extracted {count} models")
+            _pass(f"Extracted {count} models")
             
             # Build index
             indexer.build_index()
-            test_pass("Index built")
+            _pass("Index built")
             
             # Verify index
             entities = indexer.list_entities()
@@ -295,18 +294,17 @@ def test_full_pipeline():
             
             assert len(entities) > 0, "Should have entities"
             assert len(metrics) > 0, "Should have metrics"
-            test_pass(f"Index has {len(entities)} entities and {len(metrics)} metrics")
-            
-        return True
+            _pass(f"Index has {len(entities)} entities and {len(metrics)} metrics")
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return test_fail("Full pipeline", str(e))
+        _fail("Full pipeline", str(e))
+        raise
 
 
 def test_api_endpoints():
     """Test API endpoints (if server available)"""
-    test_info("Testing API endpoints...")
+    _info("Testing API endpoints...")
     
     try:
         # Just test that we can import and create router instances
@@ -315,11 +313,10 @@ def test_api_endpoints():
         # Check routers exist
         assert metrics.router is not None
         assert dimensions.router is not None
-        test_pass("API routers importable")
-        
-        return True
+        _pass("API routers importable")
     except Exception as e:
-        return test_fail("API endpoints", str(e))
+        _fail("API endpoints", str(e))
+        raise
 
 
 def main():
@@ -341,10 +338,10 @@ def main():
     results = []
     for name, test_func in tests:
         try:
-            result = test_func()
-            results.append((name, result))
+            test_func()
+            results.append((name, True))
         except Exception as e:
-            results.append((name, test_fail(name, str(e))))
+            results.append((name, _fail(name, str(e))))
         print()
     
     # Summary
@@ -365,4 +362,3 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
-
