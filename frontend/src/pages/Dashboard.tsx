@@ -39,7 +39,7 @@ export const Dashboard = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                 <StatCard label="Total Models" value={stats.models} icon={Database} to="/models" />
                 <StatCard label="Total Metrics" value={stats.metrics} icon={Activity} to="/metrics" />
-                <StatCard label="Graph Nodes" value={stats.models + stats.metrics} icon={GitGraph} to="/graph" />
+
                 <StatCard label="Run Query" value=">" icon={Code} to="/query" />
             </div>
 

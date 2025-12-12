@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, Database, BarChart3, Layers, Network, Terminal, Settings, BookOpen } from 'lucide-react';
+import { LayoutDashboard, Database, BarChart3, Layers, Network, Terminal, Settings, BookOpen, Bookmark } from 'lucide-react';
 import clsx from 'clsx';
 
 const NavItem = ({ to, icon: Icon, label }: { to: string; icon: any; label: string }) => (
@@ -37,10 +37,10 @@ export const Shell: React.FC<{ children?: React.ReactNode }> = ({ children }) =>
                     <NavItem to="/metrics" icon={BarChart3} label="Metrics" />
                     <NavItem to="/dimensions" icon={Layers} label="Dimensions" />
 
-                    <div className="px-4 py-2 text-xs font-bold text-slate-600 uppercase tracking-widest mt-6 mb-2">Knowledge</div>
-                    <NavItem to="/graph/explore" icon={Network} label="Graph Explorer" />
+
 
                     <div className="px-4 py-2 text-xs font-bold text-slate-600 uppercase tracking-widest mt-6 mb-2">Tools</div>
+                    <NavItem to="/saved-queries" icon={Bookmark} label="Saved Queries" />
                     <NavItem to="/query" icon={Terminal} label="SQL Runner" />
 
                     <div className="pt-4 mt-2 border-t border-white/10">

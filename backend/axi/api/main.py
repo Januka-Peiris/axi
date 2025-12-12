@@ -43,6 +43,7 @@ from axi.api.routers import dimensions
 from axi.api.routers import metrics
 from axi.api.routers import query
 from axi.api.routers import promotion
+from axi.api.routers import saved_queries
 
 plugin_loader = PluginLoader(["./plugins", os.path.expanduser("~/.axi/plugins")])
 plugin_loader.load_plugins()
@@ -52,6 +53,7 @@ app.include_router(dimensions.router)
 app.include_router(metrics.router)
 app.include_router(query.router)
 app.include_router(promotion.router)
+app.include_router(saved_queries.router)
 
 for router in API_ROUTERS_REGISTRY:
     app.include_router(router)
@@ -70,7 +72,13 @@ class ExtractRequest(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    snowflake_ok = None
+    try:
+        runner = SnowflakeRunner()
+        snowflake_ok = runner.test_connection()
+    except Exception:
+        snowflake_ok = False
+    return {"status": "ok", "snowflake": snowflake_ok}
 
 @app.post("/extract")
 def extract_metadata_endpoint(req: ExtractRequest):
@@ -198,7 +206,7 @@ def list_entities():
 @app.get("/api/entities/{name}")
 def get_entity_detail(name: str, include_pruned: bool = False):
     """
-    Return entity with dimensions including pruning metadata.
+    Return entity with dimensions including pruning metadata, plus metrics referencing it and relationships.
     """
     indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
     ent = indexer.get_entity(name)
@@ -219,12 +227,58 @@ def get_entity_detail(name: str, include_pruned: bool = False):
     if not include_pruned:
         dim_details = [d for d in dim_details if d.get("included")]
 
+    # Metrics referencing this entity (by model/entity_name)
+    metrics = []
+    try:
+        all_metrics = indexer.list_metrics()
+        for m in all_metrics:
+            if m.get("entity_name") == name or m.get("model") == name:
+                metrics.append(m.get("name") or m.get("metric"))
+    except Exception:
+        metrics = []
+
+    # Relationships
+    relationships = indexer.get_entity_relationships(name)
+
+    # Join keys (collect pk/fk from relationships)
+    join_keys = []
+    for rel in relationships:
+        if rel.get("pk_column"):
+            join_keys.append(rel["pk_column"])
+        if rel.get("fk_column"):
+            join_keys.append(rel["fk_column"])
+    join_keys = sorted(list({k for k in join_keys if k}))
+
+    # Grain from primary_key
+    grain = []
+    pk = ent.get("primary_key")
+    if pk:
+        if isinstance(pk, str):
+            grain = [pk]
+        elif isinstance(pk, list):
+            grain = [p for p in pk if p]
+
+    # Dimensions (names only) as fallback if no dim_details
+    dim_names = [d.get("name") or d.get("dimension") for d in dim_details if isinstance(d, dict)]
+    dim_names = [d for d in dim_names if d] or [col.get("name") for col in ent.get("columns", []) if isinstance(col, dict)]
+
     return {
         "name": name,
         "model": model_name,
         "primary_key": ent.get("primary_key"),
         "columns": ent.get("columns", []),
-        "dimensions": dim_details
+        "dimensions": dim_details,
+        "dimension_names": dim_names,
+        "type": ent.get("type"),
+        "is_read_only": bool(ent.get("is_read_only")),
+        "is_staging": bool(ent.get("is_staging")),
+        "physical_location": ent.get("physical_location"),
+        "schema": ent.get("schema_name"),
+        "database": ent.get("database_name"),
+        "metrics": metrics,
+        "relationships": relationships,
+        "join_keys": join_keys,
+        "grain": grain
     }
 
 @app.get("/graph")
@@ -260,6 +314,172 @@ def graph():
     except Exception as e:
         # Return empty graph on error
         return {"nodes": [], "edges": []}
+
+def _graph_nodes_edges(indexer, include_dimensions: bool = True):
+    nodes = []
+    edges = []
+    entities = indexer.list_entities()
+    metrics = indexer.list_metrics()
+    entity_map = {e.get("name"): e for e in entities}
+    promotion_map = {}
+    try:
+        for pr in indexer.list_promotion_results():
+            name = pr.get("name")
+            if name:
+                promotion_map[name] = pr.get("status")
+    except Exception:
+        promotion_map = {}
+
+    # Entity nodes
+    for e in entities:
+        nodes.append({
+            "id": f"entity.{e.get('name')}",
+            "label": e.get("name"),
+            "type": "entity",
+            "entity_type": e.get("type"),
+            "promotion_status": promotion_map.get(e.get("name"))
+        })
+        if include_dimensions and e.get("columns"):
+            for col in e["columns"]:
+                if isinstance(col, dict):
+                    dim_name = col.get("name")
+                    if dim_name:
+                        nodes.append({
+                            "id": f"dimension.{e.get('name')}.{dim_name}",
+                            "label": dim_name,
+                            "type": "dimension"
+                        })
+                        edges.append({
+                            "from": f"entity.{e.get('name')}",
+                            "to": f"dimension.{e.get('name')}.{dim_name}",
+                            "type": "dimension"
+                        })
+
+    # Metric nodes + edges to entity
+    for m in metrics:
+        mname = m.get("name") or m.get("metric")
+        if not mname:
+            continue
+        nodes.append({
+            "id": f"metric.{mname}",
+            "label": mname,
+            "type": "metric"
+        })
+        ent_name = m.get("entity_name") or m.get("model")
+        if ent_name:
+            edges.append({
+                "from": f"entity.{ent_name}",
+                "to": f"metric.{mname}",
+                "type": "metric_dep"
+            })
+
+    # Entity relationships
+    for rel in indexer.list_relationships():
+        p = rel.get("parent_model")
+        c = rel.get("child_model")
+        if p and c:
+            edges.append({
+                "from": f"entity.{p}",
+                "to": f"entity.{c}",
+                "type": "join"
+            })
+    return nodes, edges
+
+def _local_subgraph(node_id: str, depth: int, indexer):
+    nodes, edges = _graph_nodes_edges(indexer)
+    node_lookup = {n["id"]: n for n in nodes}
+    adj = {}
+    for e in edges:
+        adj.setdefault(e["from"], []).append(e["to"])
+        adj.setdefault(e["to"], []).append(e["from"])
+    if node_id not in node_lookup:
+        return {"nodes": [], "edges": [], "error": {"code": "NODE_NOT_FOUND", "message": f"Node {node_id} not found"}}
+    visited = set([node_id])
+    q = [(node_id, 0)]
+    sub_nodes = {}
+    sub_edges = []
+    while q:
+        nid, d = q.pop(0)
+        sub_nodes[nid] = node_lookup.get(nid, {"id": nid, "label": nid, "type": "unknown"})
+        if d >= depth:
+            continue
+        for nbr in adj.get(nid, []):
+            edge_matches = [e for e in edges if (e["from"] == nid and e["to"] == nbr) or (e["to"] == nid and e["from"] == nbr)]
+            sub_edges.extend(edge_matches)
+            if nbr not in visited:
+                visited.add(nbr)
+                q.append((nbr, d + 1))
+    return {"nodes": list(sub_nodes.values()), "edges": sub_edges}
+
+@app.get("/api/graph/local")
+def graph_local_param(node: str, depth: int = 1):
+    """
+    Local subgraph for a node (entity/metric/dimension). Depth 1 or 2.
+    """
+    depth = 1 if depth < 1 else 2 if depth > 2 else depth
+    indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
+    return _local_subgraph(node, depth, indexer)
+
+@app.get("/api/graph/filtered")
+def graph_filtered(root: str, depth: int = 2, types: str = "entity,metric,dimension", promoted_only: bool = False):
+    """
+    Filtered graph walk from root with depth 1..3 and type filter.
+    Caps at 300 nodes.
+    """
+    depth = max(1, min(depth, 3))
+    indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
+    base = _local_subgraph(root, depth, indexer)
+    if base.get("error"):
+        return base
+    type_set = set([t.strip() for t in types.split(",") if t.strip()])
+    filtered_nodes = [n for n in base["nodes"] if not type_set or n.get("type") in type_set]
+    node_ids = set(n["id"] for n in filtered_nodes)
+    filtered_edges = [e for e in base["edges"] if e["from"] in node_ids and e["to"] in node_ids]
+    if len(filtered_nodes) > 300:
+        return {"error": {"code": "GRAPH_TOO_LARGE", "message": "Filtered graph exceeds 300 nodes. Narrow your filters."}}
+    return {"nodes": filtered_nodes, "edges": filtered_edges}
+
+@app.get("/api/graph/categories")
+def graph_categories():
+    nodes = [
+        {"id": "bucket.entities", "label": "Entities", "type": "bucket"},
+        {"id": "bucket.metrics", "label": "Metrics", "type": "bucket"},
+        {"id": "bucket.dimensions", "label": "Dimensions", "type": "bucket"},
+    ]
+    edges = [
+        {"from": "bucket.entities", "to": "bucket.metrics", "type": "category_relation"},
+        {"from": "bucket.entities", "to": "bucket.dimensions", "type": "category_relation"},
+    ]
+    return {"nodes": nodes, "edges": edges}
+
+@app.get("/api/graph/category_nodes")
+def graph_category_nodes(bucket: str, page: int = 1, page_size: int = 50):
+    page = max(1, page)
+    page_size = max(1, min(page_size, 200))
+    indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
+    nodes = []
+    if bucket == "entities":
+        ents = indexer.list_entities()
+        slice_ = ents[(page-1)*page_size: page*page_size]
+        for e in slice_:
+            nodes.append({"id": f"entity.{e.get('name')}", "label": e.get("name"), "type": "entity"})
+    elif bucket == "metrics":
+        mets = indexer.list_metrics()
+        slice_ = mets[(page-1)*page_size: page*page_size]
+        for m in slice_:
+            name = m.get("name") or m.get("metric")
+            if name:
+                nodes.append({"id": f"metric.{name}", "label": name, "type": "metric"})
+    elif bucket == "dimensions":
+        ents = indexer.list_entities()
+        dims = []
+        for e in ents:
+            for col in e.get("columns") or []:
+                if isinstance(col, dict):
+                    dims.append({"id": f"dimension.{e.get('name')}.{col.get('name')}", "label": col.get("name"), "type": "dimension"})
+        slice_ = dims[(page-1)*page_size: page*page_size]
+        nodes.extend(slice_)
+    return {"nodes": nodes, "edges": []}
 
 @app.get("/api/graph/local")
 def graph_local(node: str, depth: int = 1):

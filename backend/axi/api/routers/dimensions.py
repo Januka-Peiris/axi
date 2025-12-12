@@ -301,7 +301,7 @@ def get_dimension_metrics(dimension_id: int):
                     row_dict = dict(row)
                     # Use a hash of name as id, or just use name
                     result.append({
-                        "id": hash(row_dict["name"]) % (10**9),  # Simple hash-based id
+                        "id": 0,  # Force frontend to use name for navigation
                         "name": row_dict["name"],
                         "type": row_dict["type"],
                         "description": row_dict.get("description")

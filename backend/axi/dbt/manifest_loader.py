@@ -22,6 +22,7 @@ class ManifestLoader:
 
         nodes = data.get('nodes', {})
         sources = data.get('sources', {})
+        snapshots = data.get('snapshots', {})
         
         # We also need to look at 'child_map' or 'tests' usually found in nodes?
         # dbt tests are in 'nodes' with resource_type='test'
@@ -40,12 +41,25 @@ class ManifestLoader:
             
             if resource_type == 'model':
                 self._insert_model(c, node)
+                self._upsert_entity_from_model(node)
+            elif resource_type == 'seed':
+                self._insert_seed(c, node)
+                self._upsert_entity_from_model(node, override_type="seed", read_only=True)
             elif resource_type == 'test':
                 self._insert_test(c, node)
+            elif resource_type == 'snapshot':
+                self._insert_snapshot(c, node)
+                self._upsert_entity_from_model(node, override_type="snapshot")
 
         # Parse Sources
         for key, source in sources.items():
             self._insert_source(c, source)
+            self._upsert_entity_from_source(source)
+
+        # Snapshots block if present
+        for key, snap in snapshots.items():
+            self._insert_snapshot(c, snap)
+            self._upsert_entity_from_model(snap, override_type="snapshot")
 
         conn.commit()
         conn.close()
@@ -128,3 +142,95 @@ class ManifestLoader:
                           (test_name, test_type, model_name, column_name, severity, config)
                           VALUES (?, ?, ?, ?, ?, ?)''',
                        (name, test_type, model_name, column_name, severity, json.dumps(config)))
+
+    def _insert_snapshot(self, cursor, node: Dict[str, Any]):
+        # For now just reuse models table for snapshots with resource_type snapshot
+        name = node.get('name')
+        database = node.get('database')
+        schema = node.get('schema')
+        alias = node.get('alias') or name
+        relation_name = node.get('relation_name') or f"{database}.{schema}.{alias}"
+        materialization = 'snapshot'
+        path = node.get('original_file_path') or node.get('path')
+        tags = node.get('tags', [])
+        description = node.get('description', '')
+        depends_on = node.get('depends_on', {}).get('nodes', [])
+
+        cursor.execute('''INSERT INTO dbt_models 
+                          (model_name, resource_type, database, schema, alias, relation_name, materialization, path, tags, description, depends_on)
+                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                       (name, 'snapshot', database, schema, alias, relation_name, materialization, path, json.dumps(tags), description, json.dumps(depends_on)))
+
+    def _insert_seed(self, cursor, node: Dict[str, Any]):
+        name = node.get('name')
+        database = node.get('database')
+        schema = node.get('schema')
+        alias = node.get('alias') or name
+        relation_name = node.get('relation_name') or f"{database}.{schema}.{alias}"
+        materialization = 'seed'
+        path = node.get('original_file_path') or node.get('path')
+        tags = node.get('tags', [])
+        description = node.get('description', '')
+        depends_on = node.get('depends_on', {}).get('nodes', [])
+
+        cursor.execute('''INSERT INTO dbt_models 
+                          (model_name, resource_type, database, schema, alias, relation_name, materialization, path, tags, description, depends_on)
+                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                       (name, 'seed', database, schema, alias, relation_name, materialization, path, json.dumps(tags), description, json.dumps(depends_on)))
+
+    def _upsert_entity_from_model(self, node: Dict[str, Any], override_type: str = None, read_only: bool = False):
+        name = node.get('name')
+        if not name:
+            return
+        path = node.get('original_file_path') or node.get('path') or ""
+        entity_type = override_type or "model"
+        lower_path = path.lower()
+        if not override_type:
+            if "staging" in lower_path:
+                entity_type = "staging"
+            elif "marts" in lower_path:
+                entity_type = "mart"
+            elif "models" in lower_path:
+                entity_type = "model"
+        physical = node.get('relation_name')
+        database = node.get('database')
+        schema = node.get('schema')
+        alias = node.get('alias') or name
+        if not physical and database and schema and alias:
+            physical = f"{database}.{schema}.{alias}"
+        self.indexer.upsert_entity({
+            "name": name,
+            "model": name,
+            "primary_key": None,
+            "columns": node.get('columns') or [],
+            "type": entity_type,
+            "is_read_only": read_only,
+            "is_staging": entity_type == "staging",
+            "physical_location": physical,
+            "schema_name": schema,
+            "database_name": database,
+        })
+
+    def _upsert_entity_from_source(self, source: Dict[str, Any]):
+        table_name = source.get('name')
+        source_name = source.get('source_name')
+        if not table_name:
+            return
+        database = source.get('database')
+        schema = source.get('schema')
+        relation_name = source.get('relation_name')
+        if not relation_name and database and schema:
+            relation_name = f"{database}.{schema}.{table_name}"
+        self.indexer.upsert_entity({
+            "name": f"{source_name}.{table_name}" if source_name else table_name,
+            "model": table_name,
+            "primary_key": None,
+            "columns": source.get('columns') or [],
+            "type": "source",
+            "is_read_only": True,
+            "is_staging": False,
+            "physical_location": relation_name,
+            "schema_name": schema,
+            "database_name": database,
+            "source_name": source_name
+        })

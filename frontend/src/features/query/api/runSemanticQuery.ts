@@ -3,14 +3,16 @@ import client from '../../../api/client';
 
 export interface FilterItem {
   dimension: string;
-  op: '=' | '!=' | '>' | '<' | '>=' | '<=' | 'IN';
+  op: '=' | '!=' | '>' | '<' | '>=' | '<=' | 'IN' | 'NOT IN' | 'BETWEEN' | 'LIKE';
   value: any;
 }
 
 export interface SemanticQueryRequest {
+  entity?: string;
   metrics: string[];
   dimensions: string[];
   filters: FilterItem[];
+  limit?: number;
 }
 
 export interface SemanticQueryResponse {
@@ -19,6 +21,7 @@ export interface SemanticQueryResponse {
   rows: any[];
   generated_at: string;
   error: string | null;
+  execution_ms?: number;
 }
 
 export const runSemanticQuery = async (req: SemanticQueryRequest): Promise<SemanticQueryResponse> => {
@@ -42,4 +45,3 @@ export const useSqlOnly = () => {
     mutationFn: generateSqlOnly,
   });
 };
-

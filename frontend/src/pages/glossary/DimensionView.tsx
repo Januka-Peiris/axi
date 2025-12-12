@@ -66,12 +66,7 @@ export const DimensionView: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Usage Graph Placeholder */}
-                    <div className="p-6 rounded-xl bg-[#151821] border border-white/10 flex flex-col items-center justify-center min-h-[200px] text-center space-y-2">
-                        <Layers className="w-8 h-8 text-slate-600" />
-                        <p className="text-slate-500 font-medium">Visualization Available in Full Graph</p>
-                        <Link to="/graph" className="text-xs text-cyan-400 hover:text-cyan-300">Open Graph Explorer</Link>
-                    </div>
+
                 </div>
 
                 {/* Sidebar */}

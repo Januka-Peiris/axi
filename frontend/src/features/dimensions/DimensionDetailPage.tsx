@@ -81,11 +81,17 @@ export const DimensionDetailPage: React.FC = () => {
       {/* Local Subgraph */}
       <div className="space-y-4">
         <h2 className="text-xl font-bold text-white">Graph View</h2>
+        {(() => {
+          const entityName = (dimension as any)?.entity || (dimension as any)?.entity_name;
+          const nodeId = entityName ? `dimension.${entityName}.${dimension.name}` : `dimension.${dimension.name}`;
+          return (
         <LocalSubgraph 
-          nodeId={dimension.name} 
+          nodeId={nodeId}
           depth={1}
           height="400px"
         />
+          );
+        })()}
       </div>
 
       {/* Main Content Grid */}
@@ -116,4 +122,3 @@ export const DimensionDetailPage: React.FC = () => {
     </div>
   );
 };
-

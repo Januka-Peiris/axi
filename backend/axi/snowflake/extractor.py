@@ -55,6 +55,20 @@ class SnowflakeMetadataExtractor:
             ''', (row[0], row[1], row[2], row[3], row[4], str(row[5]), str(row[6])))
             table_id = c.lastrowid
             table_map[row[2]] = table_id # Store by name (simple assumption unique by name for demo)
+            # Upsert as snowflake entity (read-only)
+            physical = f"{row[0]}.{row[1]}.{row[2]}"
+            self.indexer.upsert_entity({
+                "name": row[2],
+                "model": row[2],
+                "primary_key": None,
+                "columns": [],
+                "type": "snowflake",
+                "is_read_only": True,
+                "is_staging": False,
+                "physical_location": physical,
+                "schema_name": row[1],
+                "database_name": row[0],
+            })
             
             # Fetch Columns for this table
             col_query = f"""
@@ -144,4 +158,3 @@ class SnowflakeMetadataExtractor:
     def fetch_tags(self):
         # SHOW TAGS
         pass
-

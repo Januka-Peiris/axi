@@ -23,10 +23,11 @@ export const QueryResultTable: React.FC<QueryResultTableProps> = ({
 
   const sortedRows = useMemo(() => {
     if (!sortColumn) return rows;
+    const colIndex = columns.indexOf(sortColumn);
 
     return [...rows].sort((a, b) => {
-      const aVal = a[sortColumn];
-      const bVal = b[sortColumn];
+      const aVal = Array.isArray(a) && colIndex >= 0 ? a[colIndex] : (a as any)[sortColumn];
+      const bVal = Array.isArray(b) && colIndex >= 0 ? b[colIndex] : (b as any)[sortColumn];
 
       if (aVal === null || aVal === undefined) return 1;
       if (bVal === null || bVal === undefined) return -1;
@@ -41,7 +42,7 @@ export const QueryResultTable: React.FC<QueryResultTableProps> = ({
         ? aStr.localeCompare(bStr)
         : bStr.localeCompare(aStr);
     });
-  }, [rows, sortColumn, sortDirection]);
+  }, [rows, sortColumn, sortDirection, columns]);
 
   const paginatedRows = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
@@ -57,6 +58,8 @@ export const QueryResultTable: React.FC<QueryResultTableProps> = ({
       setSortColumn(column);
       setSortDirection('asc');
     }
+    // Reset to first page when sorting changes
+    setCurrentPage(1);
   };
 
   const SortIcon = ({ column }: { column: string }) => {
@@ -145,13 +148,14 @@ export const QueryResultTable: React.FC<QueryResultTableProps> = ({
           <tbody className="divide-y divide-white/5">
             {paginatedRows.map((row, idx) => (
               <tr key={idx} className="hover:bg-white/5 transition-colors">
-                {columns.map((col) => (
-                  <td key={col} className="p-3 text-slate-300 font-mono text-sm">
-                    {row[col] !== null && row[col] !== undefined
-                      ? String(row[col])
-                      : '—'}
-                  </td>
-                ))}
+                {columns.map((col, cIdx) => {
+                  const val = Array.isArray(row) ? row[cIdx] : row[col];
+                  return (
+                    <td key={col} className="p-3 text-slate-300 font-mono text-sm">
+                      {val !== null && val !== undefined ? String(val) : '—'}
+                    </td>
+                  );
+                })}
               </tr>
             ))}
           </tbody>
@@ -160,4 +164,3 @@ export const QueryResultTable: React.FC<QueryResultTableProps> = ({
     </div>
   );
 };
-

@@ -54,7 +54,7 @@ export const EntityDetail: React.FC = () => {
             <div className="space-y-4">
                 <h2 className="text-xl font-bold text-white">Graph View</h2>
                 <LocalSubgraph 
-                    nodeId={entity.name} 
+                    nodeId={`entity.${entity.name}`} 
                     depth={1}
                     height="400px"
                 />

@@ -60,12 +60,25 @@ export const FilterBuilder: React.FC<FilterBuilderProps> = ({
 
               <select
                 value={filter.op}
-                onChange={(e) =>
+                onChange={(e) => {
+                  const newOp = e.target.value as FilterItem['op'];
+                  let newValue = filter.value;
+                  
+                  // Convert value type when operator changes
+                  if (newOp === 'IN' && !Array.isArray(newValue)) {
+                    // Switching to IN: convert string to array
+                    newValue = newValue ? [String(newValue)] : [];
+                  } else if (newOp !== 'IN' && Array.isArray(newValue)) {
+                    // Switching from IN: convert array to string (use first value or join)
+                    newValue = newValue.length > 0 ? newValue[0] : '';
+                  }
+                  
                   onUpdate(index, {
                     ...filter,
-                    op: e.target.value as FilterItem['op'],
-                  })
-                }
+                    op: newOp,
+                    value: newValue,
+                  });
+                }}
                 className="bg-[#0d0f15] border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500/50"
               >
                 {OPERATORS.map((op) => (
@@ -77,7 +90,11 @@ export const FilterBuilder: React.FC<FilterBuilderProps> = ({
 
               <input
                 type="text"
-                value={filter.value || ''}
+                value={
+                  filter.op === 'IN' && Array.isArray(filter.value)
+                    ? filter.value.join(', ')
+                    : String(filter.value || '')
+                }
                 onChange={(e) => {
                   let value: any = e.target.value;
                   // Handle IN operator - expect comma-separated values

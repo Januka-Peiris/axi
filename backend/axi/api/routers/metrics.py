@@ -58,6 +58,19 @@ def _init_metrics_tables(conn: sqlite3.Connection):
     if c.fetchone()[0] == 0:
         c.execute("INSERT INTO metrics_id_map (metric_name) SELECT name FROM metrics")
     
+    # Backfill entity_name from entities based on model or source_model
+    # This fixes issues where metrics don't show up in entity-filtered lists
+    c.execute("""
+        UPDATE metrics 
+        SET entity_name = (
+            SELECT name 
+            FROM entities 
+            WHERE entities.model = COALESCE(metrics.model, metrics.source_model)
+        ) 
+        WHERE entity_name IS NULL 
+          AND COALESCE(metrics.model, metrics.source_model) IS NOT NULL
+    """)
+    
     conn.commit()
 
 def _get_metric_id(conn: sqlite3.Connection, metric_name: str) -> Optional[int]:

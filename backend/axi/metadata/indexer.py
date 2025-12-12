@@ -6,21 +6,52 @@ import sqlite3
 import os
 import json
 import glob
+import time
+import logging
 from typing import Dict, List, Any, Optional
+
+logger = logging.getLogger(__name__)
 
 class MetadataIndexer:
     def __init__(self, metadata_dir: str):
         # metadata_dir is base dir (e.g. metadata_store)
         # We need to find models in metadata_dir/models/*.json
         self.metadata_dir = metadata_dir
+        try:
+            os.makedirs(self.metadata_dir, exist_ok=True)
+        except Exception:
+            # Best effort; open will fail later with a clearer path if not writable
+            pass
         self.db_path = os.path.join(metadata_dir, "axi.db")
         self._init_db()
 
+    def _is_remote_fs(self) -> bool:
+        """Detect WSL / Windows mount paths that dislike WAL."""
+        path = os.path.abspath(self.db_path)
+        return path.startswith("/mnt/") or ":" in path.split(os.sep)[0]
+
+    def _configure_conn(self, conn: sqlite3.Connection) -> None:
+        try:
+            conn.execute("PRAGMA busy_timeout = 7000")
+            # WAL can be problematic on Windows/WSL mounts; fall back to DELETE there.
+            if self._is_remote_fs():
+                conn.execute("PRAGMA journal_mode = DELETE")
+            else:
+                conn.execute("PRAGMA journal_mode = WAL")
+            conn.execute("PRAGMA locking_mode = NORMAL")
+        except Exception:
+            # Best-effort only
+            pass
+
     def _get_conn(self):
-        return sqlite3.connect(self.db_path)
+        # Use a small timeout and pragmas to mitigate "database is locked".
+        conn = sqlite3.connect(self.db_path, timeout=7, check_same_thread=False)
+        self._configure_conn(conn)
+        return conn
 
     def _init_db(self):
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=7, check_same_thread=False)
+        self._configure_conn(conn)
         c = conn.cursor()
     
         # Metrics Table
@@ -43,8 +74,18 @@ class MetadataIndexer:
             semi_additive_method TEXT,
             semi_additive_dimension TEXT,
             tags JSON,
-            description TEXT
+            description TEXT,
+            entity_name TEXT
         )''')
+        
+        # Ensure column exists (migration)
+        c.execute("PRAGMA table_info(metrics)")
+        m_cols = [row[1] for row in c.fetchall()]
+        if 'entity_name' not in m_cols:
+            try:
+                c.execute("ALTER TABLE metrics ADD COLUMN entity_name TEXT")
+            except Exception:
+                pass
         
         # Models Table
         c.execute('''CREATE TABLE IF NOT EXISTS models (
@@ -61,6 +102,22 @@ class MetadataIndexer:
             primary_key TEXT,
             columns JSON
         )''')
+        # Safe migrations for new columns
+        c.execute("PRAGMA table_info(entities)")
+        cols = [row[1] for row in c.fetchall()]
+        def _add_col(col_sql, name):
+            if name not in cols:
+                try:
+                    c.execute(col_sql)
+                except Exception:
+                    pass
+        _add_col("ALTER TABLE entities ADD COLUMN type TEXT", "type")
+        _add_col("ALTER TABLE entities ADD COLUMN is_read_only BOOLEAN", "is_read_only")
+        _add_col("ALTER TABLE entities ADD COLUMN is_staging BOOLEAN", "is_staging")
+        _add_col("ALTER TABLE entities ADD COLUMN physical_location TEXT", "physical_location")
+        _add_col("ALTER TABLE entities ADD COLUMN source_name TEXT", "source_name")
+        _add_col("ALTER TABLE entities ADD COLUMN schema_name TEXT", "schema_name")
+        _add_col("ALTER TABLE entities ADD COLUMN database_name TEXT", "database_name")
         
         # Relationships Table
         c.execute('''CREATE TABLE IF NOT EXISTS relationships (
@@ -342,33 +399,44 @@ class MetadataIndexer:
                     if not metric_data:
                         continue
                     
-                    # Convert YAML format to index format
-                    m_name = metric_data.get("metric")
-                    if not m_name:
-                        continue
-                    
-                    entity_name = metric_data.get("entity", "")
-                    expr = metric_data.get("expression", "")
-                    grain = json.dumps(metric_data.get("grain", [])) if metric_data.get("grain") else None
-                    dims = metric_data.get("dimensions", [])
-                    tags = metric_data.get("tags", [])
-                    desc = metric_data.get("description", "")
-                    m_type = metric_data.get("type", "custom")
-                    
-                    # Get entity's model name from pre-loaded map
-                    model_name = entity_model_map.get(entity_name) if entity_name else None
-                    
-                    # Insert or replace metric
-                    cursor.execute('''INSERT OR REPLACE INTO metrics 
-                                      (name, expression, model, grain, dimensions, filters, source_table,
-                                       metric_type, aggregation, default_dimensions, default_filter, time_dimension,
-                                       depends_on, numerator, denominator, semi_additive_method, semi_additive_dimension,
-                                       tags, description, entity_name, type) 
-                                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                                  (m_name, expr, model_name, grain, json.dumps(dims), json.dumps([]), "",
-                                   m_type, m_type, json.dumps(dims), "", "",
-                                   json.dumps([]), "", "", "", "",
-                                   json.dumps(tags), desc, entity_name, m_type))
+                # Convert YAML format to index format
+                m_name = metric_data.get("metric")
+                if not m_name:
+                    continue
+                
+                entity_name = metric_data.get("entity", "")
+                expr = metric_data.get("expression", "")
+                
+                # Robust grain handling
+                raw_grain = metric_data.get("grain", [])
+                grain = json.dumps(raw_grain) if raw_grain else "[]"
+                if raw_grain and not isinstance(raw_grain, list):
+                     # If string, wrap in list for consistency before dumping
+                     grain = json.dumps([raw_grain])
+                elif not raw_grain:
+                     grain = "[]"
+                else:
+                     grain = json.dumps(raw_grain)
+
+                dims = metric_data.get("dimensions", [])
+                tags = metric_data.get("tags", [])
+                desc = metric_data.get("description", "")
+                m_type = metric_data.get("type", "custom")
+                
+                # Get entity's model name from pre-loaded map
+                model_name = entity_model_map.get(entity_name) if entity_name else None
+                
+                # Insert or replace metric
+                cursor.execute('''INSERT OR REPLACE INTO metrics 
+                                  (name, expression, model, grain, dimensions, filters, source_table,
+                                   metric_type, aggregation, default_dimensions, default_filter, time_dimension,
+                                   depends_on, numerator, denominator, semi_additive_method, semi_additive_dimension,
+                                   tags, description, entity_name) 
+                                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                              (m_name, expr, model_name, grain, json.dumps(dims), json.dumps([]), "",
+                               m_type, m_type, json.dumps(dims), "", "",
+                               json.dumps([]), "", "", "", "",
+                               json.dumps(tags), desc, entity_name))
             except Exception as e:
                 # Log error but continue processing other metrics
                 print(f"Warning: Failed to index metric from {fpath}: {e}")
@@ -554,15 +622,22 @@ class MetadataIndexer:
             tags = metric.get("tags", [])
             desc = metric.get("description", "")
 
+            # Serialize grain if it is a list
+            if isinstance(grain, list):
+                grain = json.dumps(grain)
+            
+            print(f"DEBUG: Indexing metric {m_name}, grain type: {type(grain)}")
+            
+            
             cursor.execute('''INSERT OR REPLACE INTO metrics 
                               (name, expression, model, grain, dimensions, filters, source_table,
                                metric_type, aggregation, default_dimensions, default_filter, time_dimension,
                                depends_on, numerator, denominator, semi_additive_method, semi_additive_dimension,
-                               tags, description) 
-                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                               tags, description, entity_name) 
+                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                            (m_name, expr, model_name, grain, json.dumps(dims), json.dumps(filters), src_table,
                             m_type, agg, json.dumps(def_dims), def_filt, time_dim, json.dumps(deps),
-                            num, denom, sa_method, sa_dim, json.dumps(tags), desc))
+                            num, denom, sa_method, sa_dim, json.dumps(tags), desc, entity.get("name", model_name)))
 
     def list_metrics(self) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
@@ -609,7 +684,21 @@ class MetadataIndexer:
             c = conn.cursor()
             c.execute('SELECT * FROM entities')
             rows = c.fetchall()
-            return [dict(row) for row in rows]
+            results = []
+            for row in rows:
+                d = dict(row)
+                if d.get('columns'):
+                    try:
+                        d['columns'] = json.loads(d['columns']) if isinstance(d['columns'], str) else d['columns']
+                    except (json.JSONDecodeError, TypeError, ValueError):
+                        d['columns'] = []
+                else:
+                    d['columns'] = []
+                # Normalize booleans
+                d['is_read_only'] = bool(d.get('is_read_only'))
+                d['is_staging'] = bool(d.get('is_staging'))
+                results.append(d)
+            return results
         
     def list_relationships(self) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
@@ -649,8 +738,58 @@ class MetadataIndexer:
                         d['columns'] = []
                 else:
                     d['columns'] = []
+                d['is_read_only'] = bool(d.get('is_read_only'))
+                d['is_staging'] = bool(d.get('is_staging'))
                 return d
             return None
+
+    def get_entity_relationships(self, name: str) -> List[Dict[str, Any]]:
+        """Return relationships where entity participates as parent or child model."""
+        with self._get_conn() as conn:
+            conn.row_factory = sqlite3.Row
+            c = conn.cursor()
+            c.execute(
+                '''SELECT * FROM relationships WHERE parent_model = ? OR child_model = ?''',
+                (name, name)
+            )
+            return [dict(r) for r in c.fetchall()]
+
+    def upsert_entity(self, entity: Dict[str, Any]) -> None:
+        """
+        Insert or update an entity record with extended fields.
+        Expected keys: name (required), model, primary_key, columns, type,
+        is_read_only, is_staging, physical_location, source_name, schema_name, database_name
+        """
+        required = entity.get("name")
+        if not required:
+            return
+        cols = entity.get("columns") or []
+        if not isinstance(cols, str):
+            try:
+                cols = json.dumps(cols)
+            except Exception:
+                cols = "[]"
+        with self._get_conn() as conn:
+            c = conn.cursor()
+            c.execute(
+                """INSERT OR REPLACE INTO entities
+                (name, model, primary_key, columns, type, is_read_only, is_staging, physical_location, source_name, schema_name, database_name)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    entity.get("name"),
+                    entity.get("model"),
+                    entity.get("primary_key"),
+                    cols,
+                    entity.get("type"),
+                    1 if entity.get("is_read_only") else 0,
+                    1 if entity.get("is_staging") else 0,
+                    entity.get("physical_location"),
+                    entity.get("source_name"),
+                    entity.get("schema_name"),
+                    entity.get("database_name"),
+                ),
+            )
+            conn.commit()
 
     # Snowflake Metadata Methods
     def list_sf_tables(self) -> List[Dict[str, Any]]:
@@ -783,10 +922,41 @@ class MetadataIndexer:
     
     def clear_promotion_results(self):
         """Clear all promotion results (called before new extraction)."""
-        with self._get_conn() as conn:
-            c = conn.cursor()
-            c.execute('DELETE FROM promotion_results')
-            conn.commit()
+        attempts = 0
+        last_exc: Optional[Exception] = None
+        while attempts < 4:
+            try:
+                with self._get_conn() as conn:
+                    c = conn.cursor()
+                    c.execute('DELETE FROM promotion_results')
+                    conn.commit()
+                return
+            except sqlite3.OperationalError as exc:
+                last_exc = exc
+                if "locked" in str(exc).lower():
+                    attempts += 1
+                    time.sleep(0.25 * attempts)
+                    # On lock, try cleaning leftover WAL/SHM and retry on next loop
+                    try:
+                        for suffix in (".wal", ".shm"):
+                            wal_path = f"{self.db_path}{suffix}"
+                            if os.path.exists(wal_path):
+                                os.remove(wal_path)
+                    except Exception:
+                        pass
+                    continue
+                raise
+        # final attempt: if still locked, raise with a helpful hint
+        if last_exc and "locked" in str(last_exc).lower():
+            logger.warning(
+                "Metadata database is locked at %s; continuing without clearing promotion results. "
+                "If this persists, move AXI_METADATA_DIR off /mnt/c or stop other AXI processes.",
+                self.db_path,
+            )
+            return
+        # otherwise re-raise the last error
+        if last_exc:
+            raise last_exc
     
     def list_promotion_results(self, status: Optional[str] = None) -> List[Dict[str, Any]]:
         """List all promotion results, optionally filtered by status."""
@@ -839,5 +1009,3 @@ class MetadataIndexer:
                 c.execute('SELECT * FROM axi_constraints')
             rows = c.fetchall()
             return [dict(r) for r in rows]
-
-

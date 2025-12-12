@@ -5,6 +5,7 @@ export interface VisGraphNode {
     type: 'entity' | 'metric' | 'dimension' | 'model' | 'category';
     title?: string;
     group?: string;
+    promotion_status?: string;
     [key: string]: any;
 }
 
@@ -27,6 +28,10 @@ export interface VisGraphProps {
     enableClustering?: boolean;
     enablePhysics?: boolean;
     onStabilizationEnd?: () => void;
+    labelMode?: 'hover' | 'always' | 'never';
+    nodeSize?: 'small' | 'medium' | 'large';
+    highlightNodeIds?: string[];
+    highlightEdgeIds?: string[];
 }
 
 

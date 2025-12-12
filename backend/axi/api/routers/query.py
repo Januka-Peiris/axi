@@ -3,9 +3,11 @@
 # Change Date: 2027-01-01. Change License: MIT.
 
 from fastapi import APIRouter, HTTPException
+import snowflake.connector
 from pydantic import BaseModel, field_validator
 from typing import List, Dict, Any, Optional, Union, Literal
 from datetime import datetime
+import os
 from axi.config.settings import get_settings
 from axi.metadata.indexer import MetadataIndexer
 from axi.query.engine import SemanticQueryEngine
@@ -19,7 +21,7 @@ def _get_indexer():
 
 class FilterItem(BaseModel):
     dimension: str
-    op: Literal["=", "!=", ">", "<", ">=", "<=", "IN"]
+    op: Literal["=", "!=", ">", "<", ">=", "<=", "IN", "NOT IN", "BETWEEN", "LIKE"]
     value: Union[str, int, float, List[str]]
     
     @field_validator('dimension')
@@ -44,6 +46,11 @@ class SemanticQueryRequest(BaseModel):
     metrics: List[str]
     dimensions: List[str] = []
     filters: List[FilterItem] = []
+    limit: Optional[int] = None
+
+class RunSqlRequest(BaseModel):
+    sql: str
+    limit: int = 500
 
 def _validate_metrics(engine: SemanticQueryEngine, metric_names: List[str]) -> List[Dict[str, Any]]:
     """Validate that all metrics exist."""
@@ -62,14 +69,24 @@ def _build_filter_strings(filters: List[FilterItem]) -> List[str]:
     """Convert filter objects to SQL filter strings."""
     filter_strings = []
     for f in filters:
-        if f.op == "IN":
+        if f.op in {"IN", "NOT IN"}:
             if isinstance(f.value, list):
                 # Escape single quotes in values to prevent SQL injection
                 escaped_values = [str(v).replace("'", "''") for v in f.value]
                 values = ", ".join([f"'{v}'" for v in escaped_values])
-                filter_strings.append(f"{f.dimension} IN ({values})")
+                filter_strings.append(f"{f.dimension} {f.op} ({values})")
             else:
                 raise ValueError(f"IN operator requires list value, got {type(f.value)}")
+        elif f.op == "BETWEEN":
+            if isinstance(f.value, list) and len(f.value) == 2:
+                v1 = str(f.value[0]).replace("'", "''")
+                v2 = str(f.value[1]).replace("'", "''")
+                filter_strings.append(f"{f.dimension} BETWEEN '{v1}' AND '{v2}'")
+            else:
+                raise ValueError("BETWEEN requires a two-value list")
+        elif f.op == "LIKE":
+            escaped_value = str(f.value).replace("'", "''")
+            filter_strings.append(f"{f.dimension} LIKE '{escaped_value}'")
         elif f.op in ["=", "!=", ">", "<", ">=", "<="]:
             if isinstance(f.value, str):
                 # Escape single quotes
@@ -243,8 +260,8 @@ def run_semantic_query(req: SemanticQueryRequest):
                         }
                     )
         
-        # Convert filter objects to strings
-        filter_strings = _build_filter_strings(req.filters) if req.filters else []
+        # Pass filter objects directly for validation in engine
+        filter_strings = req.filters or []
         
         # Generate SQL
         sql = _generate_sql_for_metrics(
@@ -255,34 +272,37 @@ def run_semantic_query(req: SemanticQueryRequest):
             dialect="snowflake"
         )
         
-        # Try to execute and get results
-        columns = []
-        rows = []
-        error = None
-        
+        # Execute via Snowflake with structured errors
+        runner = SnowflakeRunner()
+        limit_val = req.limit or 500
         try:
-            runner = SnowflakeRunner()
-            rows_data, columns_data = runner.execute_query(f"{sql} LIMIT 500")
-            columns = columns_data
-            rows = rows_data
+            rows, cols, elapsed = runner.execute_query(f"{sql} LIMIT {limit_val}")
+            # rows is list[dict]
+            columns = cols
+            rows_list = [[row.get(c) for c in cols] for row in rows]
+            return {
+                "sql": sql,
+                "columns": columns,
+                "rows": rows_list,
+                "generated_at": datetime.utcnow().isoformat(),
+                "execution_ms": elapsed,
+                "entity": entity_name,
+                "metrics": req.metrics
+            }
+        except ValueError as ve:
+            raise HTTPException(status_code=400, detail={"code": "NO_SNOWFLAKE_CREDENTIALS", "message": str(ve)})
+        except snowflake.connector.errors.ProgrammingError as pe:  # type: ignore
+            raise HTTPException(status_code=400, detail={"code": "SQL_SYNTAX_ERROR", "message": str(pe)})
+        except snowflake.connector.errors.DatabaseError as de:  # type: ignore
+            raise HTTPException(status_code=401, detail={"code": "SNOWFLAKE_AUTH_FAILED", "message": str(de)})
         except Exception as e:
-            # If Snowflake not configured or query fails, return SQL only
-            error = f"Query execution failed: {str(e)}"
-            # Try to infer columns from SQL (basic parsing)
-            # For now, just use dimensions + metrics
-            columns = req.dimensions + req.metrics
-        
-        return {
-            "sql": sql,
-            "columns": columns,
-            "rows": rows,
-            "generated_at": datetime.utcnow().isoformat(),
-            "error": error
-        }
+            raise HTTPException(status_code=500, detail={"code": "SNOWFLAKE_CONNECTION_ERR", "message": str(e)})
+    except SemanticQueryEngine.SemanticError as se:  # type: ignore
+        raise HTTPException(status_code=400, detail={"code": se.code, "message": str(se), "hint": se.hint})
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail={"code": "METRIC_INVALID", "message": str(e)})
 
 @router.post("/semantic/sql-only")
 def generate_sql_only(req: SemanticQueryRequest):
@@ -327,24 +347,35 @@ def generate_sql_only(req: SemanticQueryRequest):
         filter_strings = _build_filter_strings(req.filters) if req.filters else []
         
         # Generate SQL
-        sql = _generate_sql_for_metrics(
-            engine,
-            req.metrics,
-            req.dimensions,
-            filter_strings,
-            dialect="snowflake"
-        )
+        try:
+            sql = _generate_sql_for_metrics(
+                engine,
+                req.metrics,
+                req.dimensions,
+                filter_strings,
+                dialect="snowflake"
+            )
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"METRIC_INVALID: {e}")
         
         return {
             "sql": sql,
+            "columns": [],
+            "rows": [],
+            "row_count": 0,
+            "entity": entity_name,
+            "metrics": req.metrics,
+            "grain": effective_grain,
+            "execution_ms": 0,
             "generated_at": datetime.utcnow().isoformat()
         }
     except HTTPException:
         raise
     except Exception as e:
         # Return more detailed error message
-        import traceback
         error_detail = str(e)
+        if "ENTITY_UNRESOLVED" in error_detail:
+            raise HTTPException(status_code=400, detail=error_detail)
         if "not found" in error_detail.lower():
             raise HTTPException(status_code=404, detail=error_detail)
         raise HTTPException(status_code=400, detail=f"Failed to generate SQL: {error_detail}")
@@ -423,3 +454,35 @@ def get_reachable_dimensions(req: SemanticQueryRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+
+@router.post("/run")
+def run_sql(req: RunSqlRequest):
+    """
+    Execute SQL against Snowflake with credential validation and error mapping.
+    """
+    if not req.sql or not req.sql.strip():
+        raise HTTPException(status_code=400, detail="SQL_REQUIRED")
+
+    sql = req.sql.strip()
+    if req.limit and req.limit > 0 and "limit" not in sql.lower():
+        sql = f"{sql.rstrip(';')} LIMIT {req.limit}"
+
+    runner = SnowflakeRunner()
+    try:
+        rows, cols, elapsed = runner.execute_query(sql)
+        row_list = [[row.get(c) for c in cols] for row in rows]
+        return {
+            "sql": sql,
+            "columns": cols,
+            "rows": row_list,
+            "row_count": len(row_list),
+            "execution_ms": elapsed
+        }
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=f"MISSING_CREDENTIALS: {ve}")
+    except snowflake.connector.errors.ProgrammingError as pe:  # type: ignore
+        raise HTTPException(status_code=400, detail=f"SQL_SYNTAX_ERROR: {pe}")
+    except snowflake.connector.errors.DatabaseError as de:  # type: ignore
+        raise HTTPException(status_code=401, detail=f"SNOWFLAKE_AUTH_FAILED: {de}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"CONNECTION_ERROR: {e}")

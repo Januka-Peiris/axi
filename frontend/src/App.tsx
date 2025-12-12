@@ -7,8 +7,8 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 const PromotionDashboard = lazy(() => import('./features/promotion/PromotionDashboard').then(m => ({ default: m.PromotionDashboard })));
 const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
 const Models = lazy(() => import('./pages/Models').then(m => ({ default: m.Models })));
-const GraphExplorer = lazy(() => import('./pages/GraphExplorer').then(m => ({ default: m.GraphExplorer })));
-const FilteredGraphExplorer = lazy(() => import('./pages/FilteredGraphExplorer').then(m => ({ default: m.FilteredGraphExplorer })));
+
+const SavedQueriesPage = lazy(() => import('./pages/SavedQueriesPage').then(m => ({ default: m.SavedQueriesPage })));
 const QueryRunner = lazy(() => import('./pages/QueryRunner').then(m => ({ default: m.QueryRunner })));
 const DocsPage = lazy(() => import('./pages/DocsPage').then(m => ({ default: m.DocsPage })));
 const DimensionsListPage = lazy(() => import('./features/dimensions/DimensionsListPage').then(m => ({ default: m.DimensionsListPage })));
@@ -20,6 +20,7 @@ const SemanticQueryPage = lazy(() => import('./features/query/SemanticQueryPage'
 // Use HashRouter for simpler local file execution if needed, but BrowserRouter is fine for Vite
 // Using HashRouter ensures reloading works easily without server config for SPA
 export default function App() {
+  const isDebug = import.meta.env.VITE_AXI_DEBUG === '1' || import.meta.env.VITE_AXI_DEBUG === 'true';
   return (
     <ErrorBoundary>
       <HashRouter>
@@ -33,8 +34,8 @@ export default function App() {
               <Route path="/metrics/:metricId" element={<MetricDetailPage />} />
               <Route path="/dimensions" element={<DimensionsListPage />} />
               <Route path="/dimensions/:dimensionId" element={<DimensionDetailPage />} />
-              <Route path="/graph" element={<GraphExplorer />} />
-              <Route path="/graph/explore" element={<FilteredGraphExplorer />} />
+
+              <Route path="/saved-queries" element={<SavedQueriesPage />} />
               <Route path="/query" element={<SemanticQueryPage />} />
               <Route path="/query/legacy" element={<QueryRunner />} />
 

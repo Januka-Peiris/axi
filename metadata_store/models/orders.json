@@ -4,7 +4,7 @@
     {
       "name": "order_count",
       "expression": "COUNT(*)",
-      "grain": "unknown",
+      "grain": [],
       "metric_type": "aggregate",
       "aggregation": "count",
       "default_dimensions": [],
@@ -21,7 +21,7 @@
     {
       "name": "total_amount",
       "expression": "SUM(amount)",
-      "grain": "unknown",
+      "grain": [],
       "metric_type": "aggregate",
       "aggregation": "sum",
       "default_dimensions": [],
@@ -58,5 +58,13 @@
       "total_amount"
     ]
   },
-  "relationships": []
+  "relationships": [
+    {
+      "parent_model": "customers",
+      "child_model": "orders",
+      "fk_column": "customer_id",
+      "pk_column": "id",
+      "join_type": "left"
+    }
+  ]
 }

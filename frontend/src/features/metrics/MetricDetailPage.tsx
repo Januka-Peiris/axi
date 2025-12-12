@@ -165,7 +165,7 @@ export const MetricDetailPage: React.FC = () => {
       <div className="space-y-4">
         <h2 className="text-xl font-bold text-white">Graph View</h2>
         <LocalSubgraph 
-          nodeId={metric.name} 
+          nodeId={`metric.${metric.name}`} 
           depth={1}
           height="400px"
         />
@@ -328,4 +328,3 @@ export const MetricDetailPage: React.FC = () => {
     </div>
   );
 };
-

@@ -24,6 +24,15 @@ class PromotionResult:
 class PromotionEngine:
     def __init__(self, config: Config):
         self.config = config
+        # Backward compatibility: ensure promotion section exists
+        if not hasattr(self.config, "promotion") or self.config.promotion is None:
+            from axi.config.loader import PromotionConfig
+            try:
+                include = getattr(self.config, "include", PromotionRules())
+                exclude = getattr(self.config, "exclude", PromotionRules())
+            except Exception:
+                include, exclude = PromotionRules(), PromotionRules()
+            self.config.promotion = PromotionConfig(include=include, exclude=exclude)
 
     def is_promoted(self, file_path: str, tags: List[str]) -> bool:
         """

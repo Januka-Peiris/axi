@@ -15,6 +15,10 @@ The `axi` CLI wires extraction, promotion, and querying. Key commands:
 - Generate semantic SQL: `axi query --metric <metric> --dims country,date --filters "country=US"`
 - Snowflake execution: `axi query --run` executes via `SnowflakeRunner`.
 - Time intelligence & optimization flags are also available under `axi metrics sql`.
+- Saved queries (YAML-backed):
+  - Files live in `axi/queries/<id>.yml`.
+  - API: `GET/POST/DELETE /api/saved_queries`, `POST /api/saved_queries/{id}/run` (supports override filters/limit).
+  - UI: save/load/run in the Query Console; browse at `/saved-queries`.
 
 ## Glossary & cache
 - Glossary: `axi glossary generate` and `axi glossary search <term>`.

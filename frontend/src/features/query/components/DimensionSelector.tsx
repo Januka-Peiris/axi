@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Search, Check } from 'lucide-react';
 import { useDimensionsForQuery } from '../api/listDimensions';
 import { useReachableDimensions } from '../api/getReachableDimensions';
@@ -6,12 +6,14 @@ import { useReachableDimensions } from '../api/getReachableDimensions';
 interface DimensionSelectorProps {
   selectedDimensions: string[];
   selectedMetrics: string[]; // Add this prop to filter dimensions
+  entity?: string;
   onToggle: (dimensionName: string) => void;
 }
 
 export const DimensionSelector: React.FC<DimensionSelectorProps> = ({
   selectedDimensions,
   selectedMetrics,
+  entity,
   onToggle,
 }) => {
   const { groupedDimensions, isLoading } = useDimensionsForQuery();
@@ -22,9 +24,26 @@ export const DimensionSelector: React.FC<DimensionSelectorProps> = ({
   const reachableSet = new Set(reachableDimensions);
   const shouldFilter = selectedMetrics.length > 0 && reachableDimensions.length > 0;
 
-  const filteredGroups = Object.entries(groupedDimensions).filter(([entity]) =>
-    entity.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredGroups = useMemo(() => {
+    const normalizedEntity = (entity || '').toLowerCase();
+    return Object.entries(groupedDimensions)
+      .filter(([group]) => {
+        if (normalizedEntity && group.toLowerCase() !== normalizedEntity) return false;
+        return true;
+      })
+      .map(([group, dims]) => {
+        const filteredDims = dims.filter((d) => {
+          const matchesSearch =
+            d.name.toLowerCase().includes(search.toLowerCase()) ||
+            group.toLowerCase().includes(search.toLowerCase());
+          if (!matchesSearch) return false;
+          if (shouldFilter && !reachableSet.has(d.name)) return false;
+          return true;
+        });
+        return [group, filteredDims] as [string, typeof dims];
+      })
+      .filter(([, dims]) => dims.length > 0);
+  }, [groupedDimensions, entity, search, shouldFilter, reachableSet]);
 
   return (
     <div className="h-full flex flex-col">
@@ -106,4 +125,3 @@ export const DimensionSelector: React.FC<DimensionSelectorProps> = ({
     </div>
   );
 };
-

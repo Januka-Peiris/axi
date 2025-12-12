@@ -4,7 +4,7 @@
     {
       "name": "mrr",
       "expression": "SUM(o.amount)",
-      "grain": "unknown",
+      "grain": [],
       "metric_type": "aggregate",
       "aggregation": "sum",
       "default_dimensions": [],

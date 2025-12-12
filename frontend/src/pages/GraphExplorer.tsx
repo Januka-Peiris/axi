@@ -132,27 +132,26 @@ export const GraphExplorer = () => {
         }
     };
 
-    // Show message if not in debug mode
+    // Hide legacy full graph from nav; render only for debug
     if (!isDebugMode) {
         return (
             <div className="h-full flex flex-col bg-background">
                 <div className="p-4 border-b border-white/10 bg-[#151821]">
-                    <h2 className="text-xl font-bold text-white">Graph Explorer (Debug Only)</h2>
+                    <h2 className="text-xl font-bold text-white">Graph Explorer</h2>
                 </div>
                 <div className="flex-1 flex items-center justify-center">
                     <div className="text-center max-w-md p-6">
                         <AlertCircle className="text-yellow-400 w-12 h-12 mx-auto mb-4" />
-                        <p className="text-yellow-400 font-semibold mb-2">Full Graph Disabled</p>
+                        <p className="text-yellow-400 font-semibold mb-2">Full graph disabled.</p>
                         <p className="text-slate-400 text-sm mb-4">
-                            The full global graph is only available in debug mode. 
-                            Use the filtered or local graph views instead.
+                            Use the new filtered explorer.
                         </p>
                         <div className="space-y-2">
                             <button
                                 onClick={() => navigate('/graph/explore')}
                                 className="w-full px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg font-medium transition-colors"
                             >
-                                Open Filtered Graph Explorer
+                                Open Graph Explore
                             </button>
                         </div>
                     </div>
