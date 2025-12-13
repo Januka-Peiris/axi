@@ -1,0 +1,218 @@
+{
+  "model": "stg__purchasing__suppliertransactions",
+  "metrics": [],
+  "dimensions": [
+    "suppliertransactionid",
+    "isfinalized",
+    "amountexcludingtax",
+    "outstandingbalance",
+    "paymentmethodid",
+    "supplierinvoicenumber",
+    "transactiontypeid",
+    "transactionamount",
+    "supplierid",
+    "taxamount",
+    "lasteditedby",
+    "finalizationdate",
+    "purchaseorderid",
+    "lasteditedwhen",
+    "transactiondate",
+    "_fivetran_deleted",
+    "_fivetran_synced"
+  ],
+  "dimension_details": [
+    {
+      "name": "suppliertransactionid",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "isfinalized",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "amountexcludingtax",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "outstandingbalance",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "paymentmethodid",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "supplierinvoicenumber",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "transactiontypeid",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "transactionamount",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "supplierid",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "taxamount",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "lasteditedby",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "finalizationdate",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "purchaseorderid",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "lasteditedwhen",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "transactiondate",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "_fivetran_deleted",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "_fivetran_synced",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    }
+  ],
+  "filters": [],
+  "source_tables": [
+    "renamed",
+    "SUPPLIERTRANSACTIONS",
+    "source"
+  ],
+  "entity": {
+    "name": "stg__purchasing__suppliertransactions",
+    "pk": null,
+    "columns": [
+      "*",
+      "*",
+      "suppliertransactionid",
+      "isfinalized",
+      "amountexcludingtax",
+      "outstandingbalance",
+      "paymentmethodid",
+      "supplierinvoicenumber",
+      "transactiontypeid",
+      "transactionamount",
+      "supplierid",
+      "taxamount",
+      "lasteditedby",
+      "finalizationdate",
+      "purchaseorderid",
+      "lasteditedwhen",
+      "transactiondate",
+      "_fivetran_deleted",
+      "_fivetran_synced"
+    ]
+  },
+  "relationships": [
+    {
+      "parent_model": "SUPPLIERTRANSACTIONS",
+      "child_model": "stg__purchasing__suppliertransactions",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    }
+  ]
+}

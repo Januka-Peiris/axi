@@ -1,0 +1,130 @@
+{
+  "model": "stg__warehouse__coldroomtemperatures_archive",
+  "metrics": [],
+  "dimensions": [
+    "_fivetran_id",
+    "temperature",
+    "validto",
+    "recordedwhen",
+    "validfrom",
+    "coldroomsensornumber",
+    "coldroomtemperatureid",
+    "_fivetran_deleted",
+    "_fivetran_synced"
+  ],
+  "dimension_details": [
+    {
+      "name": "_fivetran_id",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "temperature",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "validto",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "recordedwhen",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "validfrom",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "coldroomsensornumber",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "coldroomtemperatureid",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "_fivetran_deleted",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "_fivetran_synced",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    }
+  ],
+  "filters": [],
+  "source_tables": [
+    "renamed",
+    "COLDROOMTEMPERATURES_ARCHIVE",
+    "source"
+  ],
+  "entity": {
+    "name": "stg__warehouse__coldroomtemperatures_archive",
+    "pk": null,
+    "columns": [
+      "*",
+      "*",
+      "_fivetran_id",
+      "temperature",
+      "validto",
+      "recordedwhen",
+      "validfrom",
+      "coldroomsensornumber",
+      "coldroomtemperatureid",
+      "_fivetran_deleted",
+      "_fivetran_synced"
+    ]
+  },
+  "relationships": [
+    {
+      "parent_model": "COLDROOMTEMPERATURES_ARCHIVE",
+      "child_model": "stg__warehouse__coldroomtemperatures_archive",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    }
+  ]
+}

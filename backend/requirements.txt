@@ -2,5 +2,14 @@ fastapi
 uvicorn
 sqlglot
 pydantic
+pydantic-settings
+python-dotenv
 pyyaml
 snowflake-connector-python
+click
+sqlalchemy
+alembic
+networkx
+rich
+typer
+psycopg2-binary

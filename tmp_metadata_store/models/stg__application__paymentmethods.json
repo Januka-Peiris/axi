@@ -1,0 +1,108 @@
+{
+  "model": "stg__application__paymentmethods",
+  "metrics": [],
+  "dimensions": [
+    "paymentmethodid",
+    "lasteditedby",
+    "validto",
+    "validfrom",
+    "paymentmethodname",
+    "_fivetran_deleted",
+    "_fivetran_synced"
+  ],
+  "dimension_details": [
+    {
+      "name": "paymentmethodid",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "lasteditedby",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "validto",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "validfrom",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "paymentmethodname",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "_fivetran_deleted",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "_fivetran_synced",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    }
+  ],
+  "filters": [],
+  "source_tables": [
+    "renamed",
+    "PAYMENTMETHODS",
+    "source"
+  ],
+  "entity": {
+    "name": "stg__application__paymentmethods",
+    "pk": null,
+    "columns": [
+      "*",
+      "*",
+      "paymentmethodid",
+      "lasteditedby",
+      "validto",
+      "validfrom",
+      "paymentmethodname",
+      "_fivetran_deleted",
+      "_fivetran_synced"
+    ]
+  },
+  "relationships": [
+    {
+      "parent_model": "PAYMENTMETHODS",
+      "child_model": "stg__application__paymentmethods",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    }
+  ]
+}

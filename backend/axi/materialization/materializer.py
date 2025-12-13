@@ -5,10 +5,15 @@
 import json
 import time
 import re
+import logging
 from typing import List, Dict, Any, Optional
 from axi.metadata.indexer import MetadataIndexer
 from axi.query.engine import SemanticQueryEngine
 from axi.execution.snowflake_runner import SnowflakeRunner
+from axi.utils.logging_config import get_logger
+from axi.utils.sanitization import validate_metric_name, sanitize_identifier
+
+logger = get_logger(__name__)
 
 class Materializer:
     def __init__(self, indexer: MetadataIndexer):
@@ -23,51 +28,61 @@ class Materializer:
         """
         Creates or refreshes a materialized table for a metric.
         Naming: axi__<metric>__<dims>
+        
+        Note: Only full refresh is currently supported. Incremental materialization
+        requires state tracking, time dimension handling, and MERGE logic which is
+        not yet implemented.
         """
-        dim_slug = "_".join([self._slugify(d) for d in sorted(dimensions)])
-        table_name = f"axi__{self._slugify(metric_name)}__{dim_slug}"
+        # Validate and sanitize inputs
+        metric_name = validate_metric_name(metric_name)
+        dimensions = [validate_dimension_name(d) for d in dimensions if d]
+        
+        logger.info(f"Starting materialization for metric: {metric_name}, dimensions: {dimensions}, mode: {refresh_mode}")
+        
+        # Validate refresh mode
+        if refresh_mode == "incremental":
+            logger.warning(f"Incremental materialization requested but not implemented for {metric_name}")
+            raise ValueError(
+                "Incremental materialization is not yet implemented. "
+                "Please use refresh_mode='full' or 'auto'."
+            )
+        
+        # Sanitize table name components
+        safe_metric = sanitize_identifier(self._slugify(metric_name), max_length=100)
+        dim_slug = "_".join([sanitize_identifier(self._slugify(d), max_length=50) for d in sorted(dimensions)])
+        table_name = f"axi__{safe_metric}__{dim_slug}"
         if len(table_name) > 255:
-            table_name = table_name[:255] # Truncate if too long (naive)
+            table_name = table_name[:255]  # Truncate if too long
+            logger.warning(f"Table name truncated to 255 characters: {table_name}")
 
         # Generate SQL
+        logger.debug(f"Generating SQL for materialization")
         sql = self.engine.generate_sql(metric_name, dimensions, [], dialect="snowflake")
         
-        # Check if table exists
-        # Naive: try full refresh first if "create"
-        # We need state tracking in SQLite
+        # Strip semicolon if present
+        sql = sql.strip().rstrip(';')
         
-        # For this stage, we assume "create or replace" for full refresh
-        # Incremental logic requires time dimension detection
-        
-        meta = self.indexer.get_metric(metric_name)
-        time_dim = meta.get('time_dimension')
-        
-        final_mode = "full"
-        if refresh_mode == "incremental" or (refresh_mode == "auto" and time_dim):
-             # Check if we can increment
-             # Need to check if table exists in SQLite registry to know we have a base
-             # Or check Snowflake directly.
-             # MVP: Always full rebuild unless strictly incremental requested and feasible logic implemented
-             if time_dim:
-                 final_mode = "incremental"
-        
-        if final_mode == "full":
-            ddl = f"CREATE OR REPLACE TABLE {table_name} AS {sql}"
-            self.runner.execute_query(ddl)
-        else:
-            # Incremental Logic (MERGE)
-            # 1. Get max time from target
-            # 2. Select from source > max time
-            # 3. Merge
-            pass # Placeholder for complex logic, falling back to full for safety in MVP step
-            ddl = f"CREATE OR REPLACE TABLE {table_name} AS {sql}"
-            self.runner.execute_query(ddl)
+        # Full refresh: CREATE OR REPLACE TABLE
+        logger.info(f"Executing DDL for table: {table_name}")
+        ddl = f"CREATE OR REPLACE TABLE {table_name} AS {sql}"
+        self.runner.execute_query(ddl)
+        logger.info(f"Successfully created materialized table: {table_name}")
             
         # Update Registry
-        # self._update_registry(...) -> Replaced by indexer method
-        self.indexer.record_materialization(table_name, metric_name, dimensions, final_mode, f"SNOWFLAKE.{table_name}")
+        self.indexer.record_materialization(
+            table_name, 
+            metric_name, 
+            dimensions, 
+            "full", 
+            f"SNOWFLAKE.{table_name}"
+        )
         
-        return {"table": table_name, "mode": final_mode, "status": "success"}
+        return {
+            "table": table_name, 
+            "mode": "full", 
+            "status": "success",
+            "message": "Materialization completed with full refresh"
+        }
 
     def create_mart(self, mart_name: str, metrics: List[str], dimensions: List[str]):
         """

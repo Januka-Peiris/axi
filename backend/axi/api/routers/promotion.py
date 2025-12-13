@@ -6,8 +6,11 @@ from fastapi import APIRouter, HTTPException
 from typing import List, Dict, Any, Optional
 from axi.metadata.indexer import MetadataIndexer
 from axi.config.settings import get_settings
+from axi.utils.logging_config import get_logger
+from axi.exceptions import DatabaseError, MetadataError
 
 router = APIRouter(prefix="/api/promotion", tags=["promotion"])
+logger = get_logger(__name__)
 
 def _get_indexer() -> MetadataIndexer:
     settings = get_settings()
@@ -18,6 +21,7 @@ def get_promotion_dashboard():
     """
     Get promotion dashboard data including summary and all promotion results.
     """
+    logger.debug("Getting promotion dashboard")
     indexer = _get_indexer()
     
     try:
@@ -47,6 +51,7 @@ def get_promotion_dashboard():
                 "help": "Run: dbt compile && axi extract"
             })
         
+        logger.debug(f"Promotion dashboard: {len(promoted)} promoted, {len(ignored)} ignored, {len(errors)} errors")
         return {
             **summary,
             "promoted": promoted,
@@ -54,15 +59,24 @@ def get_promotion_dashboard():
             "errors": errors,
             "warnings": warnings
         }
+    except DatabaseError as e:
+        logger.warning(f"Database error loading promotion dashboard: {e}")
+        raise HTTPException(status_code=500, detail=e.to_dict())
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to load promotion data: {str(e)}")
+        logger.error(f"Unexpected error loading promotion dashboard: {e}")
+        raise HTTPException(status_code=500, detail=MetadataError(f"Failed to load promotion data: {e}", code="PROMOTION_DASHBOARD_ERROR").to_dict())
 
 @router.get("/summary")
 def get_promotion_summary():
     """Get just the promotion summary statistics."""
+    logger.debug("Getting promotion summary")
     indexer = _get_indexer()
     try:
         return indexer.get_promotion_summary()
+    except DatabaseError as e:
+        logger.warning(f"Database error loading promotion summary: {e}")
+        raise HTTPException(status_code=500, detail=e.to_dict())
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to load promotion summary: {str(e)}")
+        logger.error(f"Unexpected error loading promotion summary: {e}")
+        raise HTTPException(status_code=500, detail=MetadataError(f"Failed to load promotion summary: {e}", code="PROMOTION_SUMMARY_ERROR").to_dict())
 

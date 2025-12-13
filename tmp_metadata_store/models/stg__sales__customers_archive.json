@@ -1,0 +1,405 @@
+{
+  "model": "stg__sales__customers_archive",
+  "metrics": [],
+  "dimensions": [
+    "_fivetran_id",
+    "deliverymethodid",
+    "primarycontactpersonid",
+    "postaladdressline1",
+    "customercategoryid",
+    "postaladdressline2",
+    "customerid",
+    "paymentdays",
+    "runposition",
+    "deliverypostalcode",
+    "postalpostalcode",
+    "faxnumber",
+    "buyinggroupid",
+    "validfrom",
+    "isoncredithold",
+    "deliverylocation",
+    "customername",
+    "postalcityid",
+    "billtocustomerid",
+    "accountopeneddate",
+    "deliverycityid",
+    "websiteurl",
+    "creditlimit",
+    "isstatementsent",
+    "lasteditedby",
+    "validto",
+    "alternatecontactpersonid",
+    "standarddiscountpercentage",
+    "deliveryaddressline2",
+    "phonenumber",
+    "deliveryaddressline1",
+    "deliveryrun",
+    "_fivetran_deleted",
+    "_fivetran_synced"
+  ],
+  "dimension_details": [
+    {
+      "name": "_fivetran_id",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "deliverymethodid",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "primarycontactpersonid",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "postaladdressline1",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "customercategoryid",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "postaladdressline2",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "customerid",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "paymentdays",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "runposition",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "deliverypostalcode",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "postalpostalcode",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "faxnumber",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "buyinggroupid",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "validfrom",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "isoncredithold",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "deliverylocation",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "customername",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "postalcityid",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "billtocustomerid",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "accountopeneddate",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "deliverycityid",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "websiteurl",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "creditlimit",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "isstatementsent",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "lasteditedby",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "validto",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "alternatecontactpersonid",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "standarddiscountpercentage",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "deliveryaddressline2",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "phonenumber",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "deliveryaddressline1",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "deliveryrun",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "_fivetran_deleted",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "_fivetran_synced",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    }
+  ],
+  "filters": [],
+  "source_tables": [
+    "renamed",
+    "CUSTOMERS_ARCHIVE",
+    "source"
+  ],
+  "entity": {
+    "name": "stg__sales__customers_archive",
+    "pk": null,
+    "columns": [
+      "*",
+      "*",
+      "_fivetran_id",
+      "deliverymethodid",
+      "primarycontactpersonid",
+      "postaladdressline1",
+      "customercategoryid",
+      "postaladdressline2",
+      "customerid",
+      "paymentdays",
+      "runposition",
+      "deliverypostalcode",
+      "postalpostalcode",
+      "faxnumber",
+      "buyinggroupid",
+      "validfrom",
+      "isoncredithold",
+      "deliverylocation",
+      "customername",
+      "postalcityid",
+      "billtocustomerid",
+      "accountopeneddate",
+      "deliverycityid",
+      "websiteurl",
+      "creditlimit",
+      "isstatementsent",
+      "lasteditedby",
+      "validto",
+      "alternatecontactpersonid",
+      "standarddiscountpercentage",
+      "deliveryaddressline2",
+      "phonenumber",
+      "deliveryaddressline1",
+      "deliveryrun",
+      "_fivetran_deleted",
+      "_fivetran_synced"
+    ]
+  },
+  "relationships": [
+    {
+      "parent_model": "CUSTOMERS_ARCHIVE",
+      "child_model": "stg__sales__customers_archive",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    }
+  ]
+}

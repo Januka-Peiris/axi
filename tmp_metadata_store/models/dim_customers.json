@@ -1,0 +1,799 @@
+{
+  "model": "dim_customers",
+  "metrics": [],
+  "dimensions": [
+    "customercategoryid",
+    "buyinggroupid",
+    "primarycontactpersonid",
+    "personid",
+    "deliverycityid",
+    "cityid",
+    "postalcityid",
+    "deliverymethodid",
+    "_fivetran_deleted",
+    "validto",
+    "postaladdressline2",
+    "accountopeneddate",
+    "paymentdays",
+    "creditlimit",
+    "faxnumber",
+    "emailaddress",
+    "customername",
+    "postalpostalcode",
+    "postaladdressline1",
+    "phonenumber",
+    "deliverymethodname",
+    "deliveryaddressline1",
+    "lasteditedby",
+    "deliveryaddressline2",
+    "customerid",
+    "isstatementsent",
+    "cityname",
+    "fullname",
+    "standarddiscountpercentage",
+    "customercategoryname",
+    "validfrom",
+    "websiteurl",
+    "isoncredithold",
+    "buyinggroupname",
+    "_fivetran_synced",
+    "deliverypostalcode"
+  ],
+  "dimension_details": [
+    {
+      "name": "customercategoryid",
+      "included": true,
+      "reason": "join_key",
+      "roles": [
+        "join_key"
+      ]
+    },
+    {
+      "name": "buyinggroupid",
+      "included": true,
+      "reason": "join_key",
+      "roles": [
+        "join_key"
+      ]
+    },
+    {
+      "name": "primarycontactpersonid",
+      "included": true,
+      "reason": "join_key",
+      "roles": [
+        "join_key"
+      ]
+    },
+    {
+      "name": "personid",
+      "included": true,
+      "reason": "join_key",
+      "roles": [
+        "join_key"
+      ]
+    },
+    {
+      "name": "deliverycityid",
+      "included": true,
+      "reason": "join_key",
+      "roles": [
+        "join_key"
+      ]
+    },
+    {
+      "name": "cityid",
+      "included": true,
+      "reason": "join_key",
+      "roles": [
+        "join_key"
+      ]
+    },
+    {
+      "name": "postalcityid",
+      "included": true,
+      "reason": "join_key",
+      "roles": [
+        "join_key"
+      ]
+    },
+    {
+      "name": "deliverymethodid",
+      "included": true,
+      "reason": "join_key",
+      "roles": [
+        "join_key"
+      ]
+    },
+    {
+      "name": "_fivetran_deleted",
+      "included": true,
+      "reason": "where_filter",
+      "roles": [
+        "metric_ref",
+        "where_filter"
+      ]
+    },
+    {
+      "name": "validto",
+      "included": true,
+      "reason": "where_filter",
+      "roles": [
+        "metric_ref",
+        "where_filter"
+      ]
+    },
+    {
+      "name": "customer_id",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "customer_name",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "website_url",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "phone_number",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "fax_number",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "customer_category_name",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "buying_group_name",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "primary_contact_name",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "primary_contact_email",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "alternate_contact_name",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "alternate_contact_email",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "delivery_address_line1",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "delivery_address_line2",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "delivery_postal_code",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "delivery_city_name",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "postal_address_line1",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "postal_address_line2",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "postal_postal_code",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "postal_city_name",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "credit_limit",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "payment_days",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "standard_discount_percentage",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "delivery_method_name",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "payment_method_name",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "is_on_credit_hold",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "is_statement_sent",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "account_opened_date",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "valid_from",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "valid_to",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "last_edited_by",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "last_synced_at",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "is_deleted",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "postaladdressline2",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "accountopeneddate",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "paymentdays",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "creditlimit",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "faxnumber",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "emailaddress",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "customername",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "postalpostalcode",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "postaladdressline1",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "phonenumber",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "deliverymethodname",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "deliveryaddressline1",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "lasteditedby",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "deliveryaddressline2",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "customerid",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "isstatementsent",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "cityname",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "fullname",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "standarddiscountpercentage",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "customercategoryname",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "validfrom",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "websiteurl",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "isoncredithold",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "buyinggroupname",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "_fivetran_synced",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "deliverypostalcode",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    }
+  ],
+  "filters": [
+    "c._fivetran_deleted = FALSE AND c.validto > CURRENT_DATE"
+  ],
+  "source_tables": [
+    "final",
+    "stg__sales__customers",
+    "stg__sales__customercategories",
+    "stg__sales__buyinggroups",
+    "stg__application__people",
+    "stg__application__cities",
+    "stg__application__deliverymethods",
+    "stg__application__paymentmethods",
+    "customers_base",
+    "customer_categories",
+    "buying_groups",
+    "people",
+    "cities_delivery",
+    "cities_postal",
+    "delivery_methods"
+  ],
+  "entity": {
+    "name": "dim_customers",
+    "pk": null,
+    "columns": [
+      "*",
+      "*",
+      "*",
+      "*",
+      "*",
+      "*",
+      "*",
+      "*",
+      "*",
+      "customer_id",
+      "customer_name",
+      "website_url",
+      "phone_number",
+      "fax_number",
+      "customer_category_name",
+      "buying_group_name",
+      "primary_contact_name",
+      "primary_contact_email",
+      "alternate_contact_name",
+      "alternate_contact_email",
+      "delivery_address_line1",
+      "delivery_address_line2",
+      "delivery_postal_code",
+      "delivery_city_name",
+      "postal_address_line1",
+      "postal_address_line2",
+      "postal_postal_code",
+      "postal_city_name",
+      "credit_limit",
+      "payment_days",
+      "standard_discount_percentage",
+      "delivery_method_name",
+      "payment_method_name",
+      "is_on_credit_hold",
+      "is_statement_sent",
+      "account_opened_date",
+      "valid_from",
+      "valid_to",
+      "last_edited_by",
+      "last_synced_at",
+      "is_deleted"
+    ]
+  },
+  "relationships": [
+    {
+      "parent_model": "stg__sales__customers",
+      "child_model": "dim_customers",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "stg__sales__customercategories",
+      "child_model": "dim_customers",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "stg__sales__buyinggroups",
+      "child_model": "dim_customers",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "stg__application__people",
+      "child_model": "dim_customers",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "stg__application__cities",
+      "child_model": "dim_customers",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "stg__application__cities",
+      "child_model": "dim_customers",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "stg__application__deliverymethods",
+      "child_model": "dim_customers",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "stg__application__paymentmethods",
+      "child_model": "dim_customers",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "customer_categories",
+      "child_model": "customers_base",
+      "fk_column": "customercategoryid",
+      "pk_column": "customercategoryid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "customer_categories",
+      "child_model": "dim_customers",
+      "fk_column": "customercategoryid",
+      "pk_column": "customercategoryid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "buying_groups",
+      "child_model": "customers_base",
+      "fk_column": "buyinggroupid",
+      "pk_column": "buyinggroupid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "buying_groups",
+      "child_model": "dim_customers",
+      "fk_column": "buyinggroupid",
+      "pk_column": "buyinggroupid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "people",
+      "child_model": "customers_base",
+      "fk_column": "primarycontactpersonid",
+      "pk_column": "personid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "people",
+      "child_model": "dim_customers",
+      "fk_column": "primarycontactpersonid",
+      "pk_column": "personid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "cities_delivery",
+      "child_model": "customers_base",
+      "fk_column": "deliverycityid",
+      "pk_column": "cityid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "cities_delivery",
+      "child_model": "dim_customers",
+      "fk_column": "deliverycityid",
+      "pk_column": "cityid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "cities_postal",
+      "child_model": "customers_base",
+      "fk_column": "postalcityid",
+      "pk_column": "cityid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "cities_postal",
+      "child_model": "dim_customers",
+      "fk_column": "postalcityid",
+      "pk_column": "cityid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "delivery_methods",
+      "child_model": "customers_base",
+      "fk_column": "deliverymethodid",
+      "pk_column": "deliverymethodid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "delivery_methods",
+      "child_model": "dim_customers",
+      "fk_column": "deliverymethodid",
+      "pk_column": "deliverymethodid",
+      "join_type": "INNER"
+    }
+  ]
+}

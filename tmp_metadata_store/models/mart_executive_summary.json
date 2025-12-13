@@ -1,0 +1,690 @@
+{
+  "model": "mart_executive_summary",
+  "metrics": [
+    {
+      "name": "total_invoices",
+      "expression": "COUNT(DISTINCT i.invoice_id)",
+      "model": "mart_executive_summary",
+      "source_table": "mart_executive_summary",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "active_customers",
+      "expression": "COUNT(DISTINCT i.customer_id)",
+      "model": "mart_executive_summary",
+      "source_table": "mart_executive_summary",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "active_salespeople",
+      "expression": "COUNT(DISTINCT i.salesperson_id)",
+      "model": "mart_executive_summary",
+      "source_table": "mart_executive_summary",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_revenue",
+      "expression": "SUM(i.total_amount_including_tax)",
+      "model": "mart_executive_summary",
+      "source_table": "mart_executive_summary",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_profit",
+      "expression": "SUM(i.total_profit)",
+      "model": "mart_executive_summary",
+      "source_table": "mart_executive_summary",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "avg_invoice_value",
+      "expression": "AVG(i.total_amount_including_tax)",
+      "model": "mart_executive_summary",
+      "source_table": "mart_executive_summary",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "avg",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_units_sold",
+      "expression": "SUM(i.total_quantity)",
+      "model": "mart_executive_summary",
+      "source_table": "mart_executive_summary",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_orders",
+      "expression": "COUNT(DISTINCT o.order_id)",
+      "model": "mart_executive_summary",
+      "source_table": "mart_executive_summary",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "avg_order_value",
+      "expression": "AVG(o.total_amount_including_tax)",
+      "model": "mart_executive_summary",
+      "source_table": "mart_executive_summary",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "avg",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "cumulative_customers",
+      "expression": "COUNT(DISTINCT CASE WHEN c.first_invoice_date <= ds.metric_date THEN c.customer_id END)",
+      "model": "mart_executive_summary",
+      "source_table": "mart_executive_summary",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "new_customers",
+      "expression": "COUNT(DISTINCT CASE WHEN TIMESTAMP_TRUNC(c.first_invoice_date, MONTH) = ds.metric_date THEN c.customer_id END)",
+      "model": "mart_executive_summary",
+      "source_table": "mart_executive_summary",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "revenue_growth_pct",
+      "expression": "CASE WHEN LAG(ms.total_revenue) OVER (ORDER BY ms.metric_date NULLS LAST) > 0 THEN ((ms.total_revenue - LAG(ms.total_revenue) OVER (ORDER BY ms.metric_date NULLS LAST)) / LAG(ms.total_revenue) OVER (ORDER BY ms.metric_date NULLS LAST)) * 100 ELSE NULL END",
+      "model": "mart_executive_summary",
+      "source_table": "mart_executive_summary",
+      "grain": "unknown",
+      "metric_type": "ratio",
+      "aggregation": "custom",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "CASE WHEN LAG(ms.total_revenue) OVER (ORDER BY ms.metric_date NULLS LAST) > 0 THEN ((ms.total_revenue - LAG(ms.total_revenue) OVER (ORDER BY ms.metric_date NULLS LAST))",
+      "denominator": "LAG(ms.total_revenue) OVER (ORDER BY ms.metric_date NULLS LAST)) * 100 ELSE NULL END",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "profit_growth_pct",
+      "expression": "CASE WHEN LAG(ms.total_profit) OVER (ORDER BY ms.metric_date NULLS LAST) > 0 THEN ((ms.total_profit - LAG(ms.total_profit) OVER (ORDER BY ms.metric_date NULLS LAST)) / LAG(ms.total_profit) OVER (ORDER BY ms.metric_date NULLS LAST)) * 100 ELSE NULL END",
+      "model": "mart_executive_summary",
+      "source_table": "mart_executive_summary",
+      "grain": "unknown",
+      "metric_type": "ratio",
+      "aggregation": "custom",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "CASE WHEN LAG(ms.total_profit) OVER (ORDER BY ms.metric_date NULLS LAST) > 0 THEN ((ms.total_profit - LAG(ms.total_profit) OVER (ORDER BY ms.metric_date NULLS LAST))",
+      "denominator": "LAG(ms.total_profit) OVER (ORDER BY ms.metric_date NULLS LAST)) * 100 ELSE NULL END",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "profit_margin_pct",
+      "expression": "CASE WHEN ms.total_revenue > 0 THEN (ms.total_profit / ms.total_revenue) * 100 ELSE 0 END",
+      "model": "mart_executive_summary",
+      "source_table": "mart_executive_summary",
+      "grain": "unknown",
+      "metric_type": "ratio",
+      "aggregation": "custom",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "CASE WHEN ms.total_revenue > 0 THEN (ms.total_profit",
+      "denominator": "ms.total_revenue) * 100 ELSE 0 END",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "prev_month_revenue",
+      "expression": "prev_month_revenue /* Previous month for comparison */",
+      "model": "mart_executive_summary",
+      "source_table": "mart_executive_summary",
+      "grain": "unknown",
+      "metric_type": "ratio",
+      "aggregation": "custom",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    }
+  ],
+  "dimensions": [
+    "metric_date",
+    "invoice_date",
+    "order_date",
+    "is_deleted",
+    "prev_month_profit",
+    "prev_month_customers",
+    "avg_invoice_value",
+    "avg_order_value",
+    "profit_margin_pct",
+    "first_invoice_date",
+    "revenue_growth_pct",
+    "total_invoices",
+    "total_units_sold",
+    "total_amount_including_tax",
+    "total_quantity",
+    "cumulative_customers",
+    "salesperson_id",
+    "new_customers",
+    "prev_month_revenue",
+    "active_salespeople",
+    "profit_growth_pct",
+    "order_id",
+    "total_orders",
+    "total_revenue",
+    "invoice_id",
+    "customer_id",
+    "total_profit",
+    "*",
+    "active_customers"
+  ],
+  "dimension_details": [
+    {
+      "name": "metric_date",
+      "included": true,
+      "reason": "group_by",
+      "roles": [
+        "group_by",
+        "join_key",
+        "metric_ref",
+        "where_filter"
+      ]
+    },
+    {
+      "name": "invoice_date",
+      "included": true,
+      "reason": "group_by",
+      "roles": [
+        "group_by",
+        "metric_ref",
+        "where_filter"
+      ]
+    },
+    {
+      "name": "order_date",
+      "included": true,
+      "reason": "group_by",
+      "roles": [
+        "group_by",
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "is_deleted",
+      "included": true,
+      "reason": "where_filter",
+      "roles": [
+        "where_filter"
+      ]
+    },
+    {
+      "name": "prev_month_profit",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "prev_month_customers",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "avg_invoice_value",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "avg_order_value",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "profit_margin_pct",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "first_invoice_date",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "revenue_growth_pct",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "total_invoices",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "total_units_sold",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "total_amount_including_tax",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "total_quantity",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "cumulative_customers",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "salesperson_id",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "new_customers",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "prev_month_revenue",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "active_salespeople",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "profit_growth_pct",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "order_id",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "total_orders",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "total_revenue",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "invoice_id",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "customer_id",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "total_profit",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "*",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "active_customers",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    }
+  ],
+  "filters": [
+    "NOT invoice_date IS NULL"
+  ],
+  "source_tables": [
+    "final",
+    "fct_sales_invoices",
+    "fct_sales_orders",
+    "date_spine",
+    "monthly_sales",
+    "monthly_orders",
+    "customer_metrics",
+    "growth_metrics"
+  ],
+  "entity": {
+    "name": "mart_executive_summary",
+    "pk": null,
+    "columns": [
+      "*",
+      "metric_date",
+      "metric_date",
+      "total_invoices",
+      "active_customers",
+      "active_salespeople",
+      "total_revenue",
+      "total_profit",
+      "avg_invoice_value",
+      "total_units_sold",
+      "metric_date",
+      "total_orders",
+      "avg_order_value",
+      "metric_date",
+      "cumulative_customers",
+      "new_customers",
+      "*",
+      "total_orders",
+      "avg_order_value",
+      "cumulative_customers",
+      "new_customers",
+      "prev_month_revenue",
+      "prev_month_profit",
+      "prev_month_customers",
+      "revenue_growth_pct",
+      "profit_growth_pct",
+      "profit_margin_pct",
+      "metric_date",
+      "metric_category",
+      "total_revenue",
+      "total_profit",
+      "total_invoices",
+      "total_orders",
+      "total_units_sold",
+      "avg_invoice_value",
+      "avg_order_value",
+      "active_customers",
+      "cumulative_customers",
+      "new_customers",
+      "active_salespeople",
+      "revenue_growth_pct",
+      "profit_growth_pct",
+      "profit_margin_pct",
+      "prev_month_revenue",
+      "prev_month_profit",
+      "prev_month_customers",
+      "year",
+      "month",
+      "year_month_label",
+      "month_name"
+    ]
+  },
+  "relationships": [
+    {
+      "parent_model": "fct_sales_invoices",
+      "child_model": "mart_executive_summary",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "fct_sales_invoices",
+      "child_model": "mart_executive_summary",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "fct_sales_orders",
+      "child_model": "mart_executive_summary",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "fct_sales_invoices",
+      "child_model": "mart_executive_summary",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "monthly_orders",
+      "child_model": "monthly_sales",
+      "fk_column": "metric_date",
+      "pk_column": "metric_date",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "monthly_orders",
+      "child_model": "mart_executive_summary",
+      "fk_column": "metric_date",
+      "pk_column": "metric_date",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "customer_metrics",
+      "child_model": "monthly_sales",
+      "fk_column": "metric_date",
+      "pk_column": "metric_date",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "customer_metrics",
+      "child_model": "mart_executive_summary",
+      "fk_column": "metric_date",
+      "pk_column": "metric_date",
+      "join_type": "INNER"
+    }
+  ]
+}

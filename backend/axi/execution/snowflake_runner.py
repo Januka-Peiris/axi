@@ -6,16 +6,11 @@ import os
 import snowflake.connector
 from typing import List, Any, Dict, Tuple, Optional
 import time
-import yaml
+from pathlib import Path
 
 from axi.config.loader import load_config, SnowflakeConfig
-
-
-def _resolve_env_value(value: Optional[str]) -> Optional[str]:
-    if isinstance(value, str) and value.startswith("env:"):
-        env_key = value.split("env:", 1)[1]
-        return os.getenv(env_key)
-    return value
+from axi.config.secrets import validate_snowflake_credentials
+from pydantic import SecretStr
 
 
 class SnowflakeRunner:
@@ -25,61 +20,67 @@ class SnowflakeRunner:
     """
 
     def __init__(self, config_path: Optional[str] = None):
-        self.config_path = config_path or os.path.join(os.getcwd(), "axi.yml")
+        self.config_path = config_path or self._find_config_file()
         self.creds = self._load_credentials()
 
+    def _find_config_file(self) -> Optional[str]:
+        """Find config file in current directory or parent directories."""
+        current = Path.cwd()
+        for _ in range(5):
+            config_file = current / "axi.yml"
+            if config_file.exists():
+                return str(config_file)
+            if current.parent == current:
+                break
+            current = current.parent
+        return None
+
     def _load_credentials(self) -> SnowflakeConfig:
+        """Load Snowflake credentials from config file or environment variables."""
         cfg: Optional[SnowflakeConfig] = None
+        
+        # Try loading from config file
         if self.config_path and os.path.exists(self.config_path):
             try:
-                config = load_config(self.config_path)
+                config = load_config(config_path=self.config_path)
                 cfg = config.snowflake
             except Exception:
                 cfg = None
 
-        # Fallback to env
-        cfg = cfg or SnowflakeConfig(
-            account=os.getenv("SNOWFLAKE_ACCOUNT"),
-            user=os.getenv("SNOWFLAKE_USER"),
-            password=os.getenv("SNOWFLAKE_PASSWORD"),
-            role=os.getenv("SNOWFLAKE_ROLE"),
-            warehouse=os.getenv("SNOWFLAKE_WAREHOUSE"),
-            database=os.getenv("SNOWFLAKE_DB"),
-            schema=os.getenv("SNOWFLAKE_SCHEMA"),
-        )
-
-        # Resolve env: vars
-        cfg.account = _resolve_env_value(cfg.account)
-        cfg.user = _resolve_env_value(cfg.user)
-        cfg.password = _resolve_env_value(cfg.password)
-        cfg.role = _resolve_env_value(cfg.role)
-        cfg.warehouse = _resolve_env_value(cfg.warehouse)
-        cfg.database = _resolve_env_value(cfg.database)
-        cfg.schema = _resolve_env_value(cfg.schema)
+        # Fallback to environment variables (with AXI_ prefix for consistency)
+        if cfg is None:
+            # Support both AXI_SNOWFLAKE_* and SNOWFLAKE_* prefixes for backward compatibility
+            password = os.getenv("AXI_SNOWFLAKE_PASSWORD") or os.getenv("SNOWFLAKE_PASSWORD")
+            cfg = SnowflakeConfig(
+                account=os.getenv("AXI_SNOWFLAKE_ACCOUNT") or os.getenv("SNOWFLAKE_ACCOUNT"),
+                user=os.getenv("AXI_SNOWFLAKE_USER") or os.getenv("SNOWFLAKE_USER"),
+                password=SecretStr(password) if password else None,
+                role=os.getenv("AXI_SNOWFLAKE_ROLE") or os.getenv("SNOWFLAKE_ROLE"),
+                warehouse=os.getenv("AXI_SNOWFLAKE_WAREHOUSE") or os.getenv("SNOWFLAKE_WAREHOUSE"),
+                database=os.getenv("AXI_SNOWFLAKE_DB") or os.getenv("SNOWFLAKE_DB"),
+                schema=os.getenv("AXI_SNOWFLAKE_SCHEMA") or os.getenv("SNOWFLAKE_SCHEMA"),
+            )
+        
         return cfg
 
     def _validate_credentials(self):
-        missing = [k for k, v in {
-            "account": self.creds.account,
-            "user": self.creds.user,
-            "password": self.creds.password,
-            "warehouse": self.creds.warehouse,
-            "database": self.creds.database,
-            "schema": self.creds.schema
-        }.items() if not v]
-        if missing:
-            raise ValueError(f"MISSING_CREDENTIALS: {', '.join(missing)}")
+        """Validate Snowflake credentials using secrets validation."""
+        errors = validate_snowflake_credentials(self.creds, required_for="connection")
+        if errors:
+            error_msg = "Missing or invalid Snowflake credentials:\n" + "\n".join(f"  - {e}" for e in errors)
+            raise ValueError(error_msg)
 
     def test_connection(self) -> bool:
         try:
             self._validate_credentials()
+            password = self.creds.get_password() if self.creds.password else None
             ctx = snowflake.connector.connect(
                 user=self.creds.user,
-                password=self.creds.password,
+                password=password,
                 account=self.creds.account,
                 warehouse=self.creds.warehouse,
                 database=self.creds.database,
-                schema=self.creds.schema,
+                schema=self.creds.schema_name,
                 role=self.creds.role,
             )
             cs = ctx.cursor()
@@ -98,13 +99,14 @@ class SnowflakeRunner:
         Executes query and returns (rows as dicts, column_names, execution_ms)
         """
         self._validate_credentials()
+        password = self.creds.get_password() if self.creds.password else None
         ctx = snowflake.connector.connect(
             user=self.creds.user,
-            password=self.creds.password,
+            password=password,
             account=self.creds.account,
             warehouse=self.creds.warehouse,
             database=self.creds.database,
-            schema=self.creds.schema,
+            schema=self.creds.schema_name,
             role=self.creds.role,
         )
         cs = ctx.cursor()

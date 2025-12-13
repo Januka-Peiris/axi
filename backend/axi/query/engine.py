@@ -6,17 +6,19 @@ from typing import List, Optional, Dict, Any
 from axi.metadata.indexer import MetadataIndexer
 from axi.query.graph import SemanticGraph
 from collections import deque
+import logging
+from axi.utils.logging_config import get_logger
+from axi.utils.sanitization import sanitize_identifier, validate_dimension_name
+from axi.exceptions import QueryError
+
+logger = get_logger(__name__)
 
 class SemanticQueryEngine:
     def __init__(self, indexer: MetadataIndexer):
         self.indexer = indexer
         self.graph = SemanticGraph(indexer)
 
-    class SemanticError(Exception):
-        def __init__(self, code: str, message: str, hint: Optional[str] = None):
-            super().__init__(message)
-            self.code = code
-            self.hint = hint
+    # SemanticError removed - use QueryError from axi.exceptions instead
 
     def resolve_entity_physical_location(self, entity_name: str) -> Optional[str]:
         ent = self.indexer.get_entity(entity_name)
@@ -87,9 +89,9 @@ class SemanticQueryEngine:
                 visited.add(nxt)
                 queue.append((nxt, new_path))
         if not paths:
-            raise self.SemanticError("JOIN_NOT_FOUND", f"No join path from {metric_entity} to {dim_entity}", hint="Add relationship or adjust dimensions.")
+            raise QueryError(f"No join path from {metric_entity} to {dim_entity}", code="JOIN_NOT_FOUND", hint="Add relationship or adjust dimensions.")
         if len(paths) > 1:
-            raise self.SemanticError("JOIN_AMBIGUOUS", f"Multiple join paths from {metric_entity} to {dim_entity}", hint="Narrow relationships or specify explicit path.")
+            raise QueryError(f"Multiple join paths from {metric_entity} to {dim_entity}", code="JOIN_AMBIGUOUS", hint="Narrow relationships or specify explicit path.")
         return paths[0]
     
     def get_effective_grain(self, metric: Dict[str, Any], entity: Optional[Dict[str, Any]] = None) -> List[str]:
@@ -265,7 +267,7 @@ class SemanticQueryEngine:
 
 
 
-    def generate_sql(self, metric_name: str, dimensions: List[str] = [], filters: List[Any] = [], dialect: str = "ansi", compare: str = None, window: str = None, optimize: bool = True) -> str:
+    def generate_sql(self, metric_name: str, dimensions: List[str] = [], filters: List[Any] = [], dialect: str = "postgres", compare: str = None, window: str = None, optimize: bool = True) -> str:
         """
         Generates SQL for a given metric and context.
         Supports:
@@ -274,12 +276,14 @@ class SemanticQueryEngine:
         - Derived Metrics (Basic Expansion)
         - Time Intelligence (Compare, Window)
         """
+        logger.debug(f"Generating SQL for metric: {metric_name}, dimensions: {dimensions}, filters: {len(filters)}")
         dimensions = dimensions or []
         filters = filters or []
         
         metric = self.indexer.get_metric(metric_name)
         if not metric:
-            raise self.SemanticError("UNSUPPORTED_METRIC", f"Metric '{metric_name}' not found")
+            logger.warning(f"Metric not found: {metric_name}")
+            raise QueryError(f"Metric '{metric_name}' not found", code="UNSUPPORTED_METRIC")
         
         # 1. Resolve effective grain
         entity = None
@@ -288,17 +292,30 @@ class SemanticQueryEngine:
             entity = self.resolve_entity(entity_name)
         
         effective_grain = self.get_effective_grain(metric, entity)
+        logger.debug(f"Effective grain for {metric_name}: {effective_grain}")
             
         # 2. Apply Defaults
         if not dimensions:
              # Try default_dimensions, then grain, then inference
              default_dims = metric.get('default_dimensions', [])
              if default_dims:
-                 # Validate it's a list
-                 dimensions = default_dims if isinstance(default_dims, list) else []
+                 # Deserialize if it's a JSON string
+                 import json
+                 if isinstance(default_dims, str):
+                     try:
+                         default_dims = json.loads(default_dims)
+                     except (json.JSONDecodeError, TypeError):
+                         default_dims = []
+                 # Validate it's a list and extract string values
+                 if isinstance(default_dims, list):
+                     dimensions = [str(d) for d in default_dims if d]
+                 else:
+                     dimensions = []
+                 logger.debug(f"Using default dimensions: {dimensions}")
              elif effective_grain:
                  # Use effective grain as default dimensions
-                 dimensions = effective_grain.copy()
+                 dimensions = [str(d) for d in effective_grain if d]
+                 logger.debug(f"Using effective grain as dimensions: {dimensions}")
         
         default_filter = metric.get('default_filter')
         if default_filter:
@@ -316,7 +333,7 @@ class SemanticQueryEngine:
             physical = self.resolve_entity_physical_location(entity_name)
         source_table = physical or metric.get('source_table') or source_model
         if not source_table:
-            raise self.SemanticError("ENTITY_UNRESOLVED", f"Cannot resolve physical location for entity '{entity_name or source_model}'")
+            raise QueryError(f"Cannot resolve physical location for entity '{entity_name or source_model}'", code="ENTITY_UNRESOLVED")
         base_filters = metric.get('filters') or []
         
         # 3. Time Intelligence Prep
@@ -333,9 +350,10 @@ class SemanticQueryEngine:
         aliases: Dict[str, str] = {}
 
         def sanitize_ident(s: str):
-            if not all(c.isalnum() or c in "_. " for c in s):
-                raise self.SemanticError("INVALID_IDENTIFIER", f"Invalid identifier: {s}")
-            return s
+            try:
+                return sanitize_identifier(s)
+            except ValueError as e:
+                raise QueryError(str(e), code="INVALID_IDENTIFIER")
 
         def get_alias(model: str) -> str:
             if model in aliases:
@@ -353,13 +371,22 @@ class SemanticQueryEngine:
 
         # Parse dimensions, detect target entities and validate existence
         for dim in dimensions:
+            # Validate dimension name
+            try:
+                validate_dimension_name(dim)
+            except ValueError as e:
+                logger.warning(f"Invalid dimension name: {dim} - {e}")
+                raise QueryError(f"Invalid dimension name: {dim}", code="INVALID_DIMENSION")
+            
             sanitize_ident(dim)
             if "." in dim:
                 model, col = dim.split(".", 1)
                 target_models.add(model)
                 clean_dims.append((model, col))
             else:
-                clean_dims.append((source_model, dim))
+                # Use entity_name for dimension resolution if available, fallback to source_model
+                dim_model = entity_name or source_model
+                clean_dims.append((dim_model, dim))
 
         # Resolve joins for each target model
         for tgt in target_models:
@@ -374,7 +401,7 @@ class SemanticQueryEngine:
                 r_col = edge.get("target_col")
                 
                 if not l_col or not r_col:
-                    raise self.SemanticError("JOIN_NOT_FOUND", f"Join keys missing between {left} and {right}")
+                    raise QueryError(f"Join keys missing between {left} and {right}", code="JOIN_NOT_FOUND")
                 
                 # Cartesian risk check can be improved by checking if join keys are PKs
                 # For now, we trust the relationship definition
@@ -388,7 +415,18 @@ class SemanticQueryEngine:
         allowed_ops = {"=", "!=", ">", "<", ">=", "<=", "IN", "NOT IN", "BETWEEN", "LIKE"}
 
         def _dimension_exists(model: str, col: str) -> bool:
+            # Try entity name first, then model name
             ent = self.indexer.get_entity(model)
+            if not ent:
+                # If model is actually a model name, try to find entity by model
+                model_obj = self.indexer.get_model(model)
+                if model_obj:
+                    # Find entity with this model
+                    entities = self.indexer.list_entities()
+                    for e in entities:
+                        if e.get("model") == model:
+                            ent = e
+                            break
             if ent and ent.get("columns"):
                 for c in ent["columns"]:
                     if isinstance(c, dict) and c.get("name") == col:
@@ -396,7 +434,18 @@ class SemanticQueryEngine:
             return True  # if unknown, allow
 
         def _dimension_type(model: str, col: str) -> Optional[str]:
+            # Try entity name first, then model name
             ent = self.indexer.get_entity(model)
+            if not ent:
+                # If model is actually a model name, try to find entity by model
+                model_obj = self.indexer.get_model(model)
+                if model_obj:
+                    # Find entity with this model
+                    entities = self.indexer.list_entities()
+                    for e in entities:
+                        if e.get("model") == model:
+                            ent = e
+                            break
             if ent and ent.get("columns"):
                 for c in ent["columns"]:
                     if isinstance(c, dict) and c.get("name") == col:
@@ -409,58 +458,70 @@ class SemanticQueryEngine:
                 op = f.get("op")
                 val = f.get("value")
                 if not dim:
-                    raise self.SemanticError("DIMENSION_NOT_FOUND", "Filter missing dimension")
+                    raise QueryError("Filter missing dimension", code="DIMENSION_NOT_FOUND")
                 if op not in allowed_ops:
-                    raise self.SemanticError("INVALID_FILTER_OPERATOR", f"Operator {op} not allowed")
+                    raise QueryError(f"Operator {op} not allowed", code="INVALID_FILTER_OPERATOR")
                 if "." in dim:
                     m, c = dim.split(".", 1)
                 else:
-                    m, c = source_model, dim
+                    # Use entity_name if available, fallback to source_model
+                    m, c = (entity_name or source_model), dim
                 if not _dimension_exists(m, c):
-                    raise self.SemanticError("DIMENSION_NOT_FOUND", f"Dimension '{dim}' not found")
+                    raise QueryError(f"Dimension '{dim}' not found", code="DIMENSION_NOT_FOUND")
                 dtype = (_dimension_type(m, c) or "").lower()
                 if dtype:
                     if "date" in dtype or "time" in dtype:
                         # allow comparisons but ensure value convertible
                         if op in {"LIKE"}:
-                            raise self.SemanticError("TYPE_MISMATCH", f"Cannot use LIKE on date dimension {dim}")
+                            raise QueryError(f"Cannot use LIKE on date dimension {dim}", code="TYPE_MISMATCH")
                     if "int" in dtype or "number" in dtype or "decimal" in dtype:
                         if op == "LIKE":
-                            raise self.SemanticError("TYPE_MISMATCH", f"Cannot use LIKE on numeric dimension {dim}")
+                            raise QueryError(f"Cannot use LIKE on numeric dimension {dim}", code="TYPE_MISMATCH")
                 alias = get_alias(m)
-                if op in {"IN", "NOT IN"} and isinstance(val, list):
-                    vals = ", ".join([f"'{sanitize_ident(str(v))}'" for v in val])
-                    validated_filters.append(f"{alias}.{c} {op} ({vals})")
+                if op in {"IN", "NOT IN"}:
+                    if isinstance(val, list):
+                        vals = ", ".join([f"'{sanitize_ident(str(v))}'" for v in val])
+                        validated_filters.append(f"{alias}.{c} {op} ({vals})")
+                    else:
+                        raise QueryError(f"Operator {op} requires a list value", code="INVALID_FILTER_VALUE")
                 elif op == "BETWEEN" and isinstance(val, list) and len(val) == 2:
                     validated_filters.append(f"{alias}.{c} BETWEEN '{sanitize_ident(str(val[0]))}' AND '{sanitize_ident(str(val[1]))}'")
                 else:
                     validated_filters.append(f"{alias}.{c} {op} '{sanitize_ident(str(val))}'")
             elif isinstance(f, str):
                 if ";" in f or "--" in f or "/*" in f:
-                    raise self.SemanticError("INVALID_FILTER_OPERATOR", "Unsafe filter")
+                    raise QueryError("Unsafe filter", code="INVALID_FILTER_OPERATOR")
                 validated_filters.append(f)
             else:
-                raise self.SemanticError("INVALID_FILTER_OPERATOR", f"Unsupported filter format: {f}")
+                raise QueryError(f"Unsupported filter format: {f}", code="INVALID_FILTER_OPERATOR")
 
         # 5. Core Query Construction
-        # Validate grain availability
+        # Validate grain availability (tolerant to missing metadata)
+        valid_grain = []
         if effective_grain:
+            grain_entity_name = entity_name or source_model
             for g in effective_grain:
+                if not g or str(g).lower() == "unknown":
+                    continue
                 if "." in g:
                     gm, gc = g.split(".", 1)
                 else:
-                    gm, gc = source_model, g
-                if not self.indexer.get_entity(gm):
-                    raise self.SemanticError("INVALID_GRAIN", f"Grain entity '{gm}' not found")
-                # basic check for column existence
+                    gm, gc = grain_entity_name, g
                 ent = self.indexer.get_entity(gm)
-                cols = ent.get("columns") if ent else []
+                if not ent:
+                    logger.warning(f"Skipping grain validation: entity '{gm}' not found for metric '{metric_name}'")
+                    continue
+                cols = ent.get("columns") or []
                 if cols and not any((isinstance(c, dict) and c.get("name") == gc) for c in cols):
-                    raise self.SemanticError("INVALID_GRAIN", f"Grain column '{gc}' not found on '{gm}'")
+                    logger.warning(f"Skipping grain column '{gc}' on entity '{gm}' (not found); continuing without strict grain enforcement")
+                    continue
+                valid_grain.append(g)
+
+        grain_for_sql = valid_grain or [g for g in effective_grain if g and str(g).lower() != "unknown"]
 
         # GROUP BY: combine selected dimensions and grain
         grain_dims_clean = []
-        for grain_dim in effective_grain:
+        for grain_dim in grain_for_sql:
             if "." in grain_dim:
                 model, col = grain_dim.split(".", 1)
                 grain_dims_clean.append((model, col))
@@ -477,7 +538,7 @@ class SemanticQueryEngine:
         # SELECT with aliases
         select_dim_sql = [f"{get_alias(m)}.{d} AS {d}" for m, d in all_group]
         if metric_alias in [d for _, d in all_group]:
-            raise self.SemanticError("ALIAS_COLLISION", f"Metric '{metric_alias}' conflicts with dimension name")
+            raise QueryError(f"Metric '{metric_alias}' conflicts with dimension name", code="ALIAS_COLLISION")
         select_cols = select_dim_sql + [f"{final_expr} AS {metric_alias}"]
 
         # FROM
@@ -515,6 +576,7 @@ class SemanticQueryEngine:
         
         # Optimization
         if optimize:
+            logger.debug(f"Optimizing SQL for dialect: {dialect}")
             # Lazy load
             from axi.optimizer.core import Optimizer, OptimizationContext
             from axi.optimizer.rules import get_default_rules
@@ -527,6 +589,7 @@ class SemanticQueryEngine:
                  opt.add_rule(rule)
             
             final_sql = opt.optimize(final_sql, dialect=dialect)
+            logger.debug("SQL optimization completed")
         
         # Hooks: Before Execute (actually before return of SQL string)
         from axi.plugins.registry import HOOKS_REGISTRY

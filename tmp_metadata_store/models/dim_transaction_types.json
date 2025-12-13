@@ -1,0 +1,163 @@
+{
+  "model": "dim_transaction_types",
+  "metrics": [],
+  "dimensions": [
+    "_fivetran_deleted",
+    "validto",
+    "lasteditedby",
+    "transactiontypename",
+    "validfrom",
+    "transactiontypeid",
+    "_fivetran_synced"
+  ],
+  "dimension_details": [
+    {
+      "name": "_fivetran_deleted",
+      "included": true,
+      "reason": "where_filter",
+      "roles": [
+        "metric_ref",
+        "where_filter"
+      ]
+    },
+    {
+      "name": "validto",
+      "included": true,
+      "reason": "where_filter",
+      "roles": [
+        "metric_ref",
+        "where_filter"
+      ]
+    },
+    {
+      "name": "transaction_type_id",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "transaction_type_name",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "valid_from",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "valid_to",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "last_edited_by",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "last_synced_at",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "is_deleted",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "lasteditedby",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "transactiontypename",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "validfrom",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "transactiontypeid",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "_fivetran_synced",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    }
+  ],
+  "filters": [
+    "_fivetran_deleted = FALSE AND validto > CURRENT_DATE"
+  ],
+  "source_tables": [
+    "final",
+    "stg__application__transactiontypes",
+    "transaction_types_base"
+  ],
+  "entity": {
+    "name": "dim_transaction_types",
+    "pk": null,
+    "columns": [
+      "*",
+      "*",
+      "transaction_type_id",
+      "transaction_type_name",
+      "transaction_category",
+      "transaction_scope",
+      "valid_from",
+      "valid_to",
+      "last_edited_by",
+      "last_synced_at",
+      "is_deleted"
+    ]
+  },
+  "relationships": [
+    {
+      "parent_model": "stg__application__transactiontypes",
+      "child_model": "dim_transaction_types",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    }
+  ]
+}

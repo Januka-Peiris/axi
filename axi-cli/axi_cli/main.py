@@ -22,13 +22,17 @@ from axi.execution.snowflake_runner import SnowflakeRunner
 app = typer.Typer()
 
 from axi.config.settings import get_settings
+from axi.config.env_loader import load_env_file
 from .scaffold import scaffold_project
 from .generate import generate_metric, generate_dimension, generate_glossary, generate_rule_promotion
+
+# Load .env files before initializing settings
+load_env_file()
 
 settings = get_settings()
 
 # Define storage locations
-METADATA_DIR = settings.AXI_METADATA_DIR
+METADATA_DIR = settings.metadata_dir
 
 # Plugin Init
 from axi.plugins.loader import PluginLoader
@@ -110,6 +114,13 @@ def extract(
     """
     Run metadata extraction on the given path (CLI-mode).
     """
+    # Silence noisy sqlglot warnings about ToChar format args during parsing
+    import warnings
+    warnings.filterwarnings(
+        "ignore",
+        message=r"Argument 'format' is not supported for expression 'ToChar' when targeting.*",
+        category=Warning,
+    )
     if debug or debug_models:
         os.environ["AXI_DEBUG"] = "true"
     else:
@@ -137,6 +148,7 @@ def extract(
     
     # Determine SQL root using exact priority order
     sql_root = None
+    compiled_roots: List[str] = []
     user_passed_path = path is not None and path != "."
     
     # Decision tree implementation
@@ -148,20 +160,20 @@ def extract(
             raise typer.Exit(1)
         if os.environ.get("AXI_DEBUG") == "true":
             print(f"[AXI-DEBUG] Using SQL root (user-provided): {sql_root}")
-    elif config.dbt and config.dbt.compiled_path:
-        # (2) axi.yml has dbt.compiled_path → use it
+    elif not no_dbt and config.dbt and config.dbt.compiled_path:
+        # (2) axi.yml has dbt.compiled_path → scan project root, prefer configured compiled path
+        sql_root = project_root
         if os.path.isabs(config.dbt.compiled_path):
-            sql_root = config.dbt.compiled_path
+            compiled_path = config.dbt.compiled_path
         else:
-            sql_root = os.path.join(project_root, config.dbt.compiled_path)
-        
-        if not os.path.exists(sql_root):
-            typer.echo(f"✗ Error: Compiled dbt models not found at: {sql_root}")
-            typer.echo("  Run: dbt compile")
-            raise typer.Exit(1)
-        
+            compiled_path = os.path.join(project_root, config.dbt.compiled_path)
+        compiled_roots.append(compiled_path)
+        if not os.path.exists(compiled_path):
+            typer.echo(f"[WARN] Compiled dbt models not found at: {compiled_path}")
+            typer.echo("       Falling back to raw SQL; run 'dbt compile' for best results.")
         if os.environ.get("AXI_DEBUG") == "true":
-            print(f"[AXI-DEBUG] Using SQL root (from config): {sql_root}")
+            print(f"[AXI-DEBUG] Using SQL root (project): {sql_root}")
+            print(f"[AXI-DEBUG] Compiled SQL fallback: {compiled_path}")
     elif not no_dbt:
         # (3) Check for dbt manifest
         dbt_project_file = os.path.join(project_root, "dbt_project.yml")
@@ -184,15 +196,15 @@ def extract(
                     
                     if project_name:
                         default_compiled_path = os.path.join(project_root, "target", "compiled", project_name)
-                        if os.path.exists(default_compiled_path):
-                            sql_root = default_compiled_path
-                            if os.environ.get("AXI_DEBUG") == "true":
-                                print(f"[AXI-DEBUG] Using SQL root (from dbt manifest): {sql_root}")
-                        else:
-                            typer.echo("✗ Error: Compiled dbt models not found.")
-                            typer.echo(f"  Expected at: {default_compiled_path}")
-                            typer.echo("  Run: dbt compile")
-                            raise typer.Exit(1)
+                        compiled_roots.append(default_compiled_path)
+                        sql_root = project_root
+                        if not os.path.exists(default_compiled_path):
+                            typer.echo("[WARN] Compiled dbt models not found.")
+                            typer.echo(f"       Expected at: {default_compiled_path}")
+                            typer.echo("       Falling back to raw SQL; run 'dbt compile' for best results.")
+                        if os.environ.get("AXI_DEBUG") == "true":
+                            print(f"[AXI-DEBUG] Using SQL root (dbt project): {sql_root}")
+                            print(f"[AXI-DEBUG] Compiled SQL fallback: {default_compiled_path}")
                     else:
                         typer.echo("✗ Error: Could not determine dbt project name.")
                         typer.echo("  Run: dbt compile")
@@ -223,7 +235,7 @@ def extract(
     
     # Create scanner with sql_root
     promotion_engine = PromotionEngine(config)
-    scanner = SqlScanner(sql_root, promotion_engine)
+    scanner = SqlScanner(sql_root, promotion_engine, compiled_roots=compiled_roots)
     writer = MetadataWriter(METADATA_DIR)
     indexer = MetadataIndexer(METADATA_DIR)
     

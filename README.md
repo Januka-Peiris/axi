@@ -61,7 +61,13 @@ Then open http://localhost:5173.
 ```
 docker-compose up --build
 ```
-Starts API (FastAPI), UI (Vite/React), and demo metadata.
+Starts API (FastAPI), UI (Vite/React), PostgreSQL database, and demo metadata.
+
+**Database Options:**
+- **SQLite (default)**: Embedded database, no setup required. Perfect for local development.
+- **PostgreSQL**: Server database for production. Configure via environment variables in `docker/compose.yaml`.
+
+See `backend/axi/config/README.md` for detailed database configuration options.
 
 ## Documentation
 Documentation lives in a separate repo: https://github.com/your-org/axi-docs

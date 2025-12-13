@@ -22,10 +22,12 @@ class SqlScanner:
     """
     Scans SQL files from a given root directory.
     All paths are computed relative to sql_root for promotion matching.
+    Optionally accepts compiled_roots to prefer compiled SQL outside sql_root.
     """
-    def __init__(self, sql_root: str, promotion_engine: PromotionEngine):
+    def __init__(self, sql_root: str, promotion_engine: PromotionEngine, compiled_roots: Optional[List[str]] = None):
         self.sql_root = os.path.abspath(sql_root)
         self.promotion_engine = promotion_engine
+        self.compiled_roots = [os.path.abspath(p) for p in compiled_roots] if compiled_roots else []
         self.project_name = self._get_project_name()
 
     def _debug(self, msg: str):
@@ -44,7 +46,7 @@ class SqlScanner:
             return
         
         # Exclude common non-SQL directories
-        excludes = {"target", "dbt_packages", "logs", "macros", "tests", "snapshots", "analysis", "__pycache__", ".git"}
+        excludes = {"target", "dbt_packages", "logs", "macros", "tests", "hooks", "snapshots", "analysis", "__pycache__", ".git"}
         
         try:
             self._debug(f"Contents of SQL root: {os.listdir(self.sql_root)}")
@@ -53,7 +55,12 @@ class SqlScanner:
 
         for root, dirs, files in os.walk(self.sql_root):
             # Filter directories
-            dirs[:] = [d for d in dirs if d not in excludes and not d.startswith(".")]
+            dirs[:] = [
+                d for d in dirs
+                if d not in excludes
+                and not d.startswith(".")
+                and not d.endswith(".yml")  # avoid dbt_project.yml dirs/symlinks
+            ]
             
             self._debug(f"Scanning directory: {root}")
 
@@ -66,6 +73,19 @@ class SqlScanner:
                 rel_path = os.path.relpath(full_path, self.sql_root)
                 # Normalize path separators
                 rel_path = rel_path.replace("\\", "/")
+                rel_lower = rel_path.lower()
+
+                # Skip tests/hooks artifacts that aren't real models
+                if (
+                    "tests/" in rel_lower
+                    or rel_lower.startswith("tests/")
+                    or "/test_" in rel_lower
+                    or rel_lower.startswith("test_")
+                    or "schema_test" in rel_lower
+                    or "hooks/" in rel_lower
+                ):
+                    self._debug(f"[SKIP] Test/Hook artifact: {rel_path}")
+                    continue
 
                 try:
                     with open(full_path, "r", encoding="utf-8") as f:
@@ -76,6 +96,15 @@ class SqlScanner:
 
                 # Prefer compiled dbt SQL if available
                 compiled_candidates = []
+
+                # Highest priority: explicit compiled roots
+                for comp_root in self.compiled_roots:
+                    compiled_candidates.append(os.path.join(comp_root, rel_path))
+                    compiled_candidates.extend(
+                        glob.glob(os.path.join(comp_root, "**", rel_path), recursive=True)
+                    )
+
+                # Default compiled locations relative to sql_root
                 if self.project_name:
                     compiled_candidates.append(os.path.join(self.sql_root, "target", "compiled", self.project_name, rel_path))
                 compiled_candidates.append(os.path.join(self.sql_root, "target", "compiled", rel_path))

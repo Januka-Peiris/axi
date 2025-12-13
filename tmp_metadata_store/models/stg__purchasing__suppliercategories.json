@@ -1,0 +1,108 @@
+{
+  "model": "stg__purchasing__suppliercategories",
+  "metrics": [],
+  "dimensions": [
+    "suppliercategoryid",
+    "lasteditedby",
+    "validto",
+    "suppliercategoryname",
+    "validfrom",
+    "_fivetran_deleted",
+    "_fivetran_synced"
+  ],
+  "dimension_details": [
+    {
+      "name": "suppliercategoryid",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "lasteditedby",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "validto",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "suppliercategoryname",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "validfrom",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "_fivetran_deleted",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "_fivetran_synced",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    }
+  ],
+  "filters": [],
+  "source_tables": [
+    "renamed",
+    "SUPPLIERCATEGORIES",
+    "source"
+  ],
+  "entity": {
+    "name": "stg__purchasing__suppliercategories",
+    "pk": null,
+    "columns": [
+      "*",
+      "*",
+      "suppliercategoryid",
+      "lasteditedby",
+      "validto",
+      "suppliercategoryname",
+      "validfrom",
+      "_fivetran_deleted",
+      "_fivetran_synced"
+    ]
+  },
+  "relationships": [
+    {
+      "parent_model": "SUPPLIERCATEGORIES",
+      "child_model": "stg__purchasing__suppliercategories",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    }
+  ]
+}

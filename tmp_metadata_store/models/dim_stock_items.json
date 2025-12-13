@@ -1,0 +1,699 @@
+{
+  "model": "dim_stock_items",
+  "metrics": [],
+  "dimensions": [
+    "stockgroupid",
+    "supplierid",
+    "colorid",
+    "unitpackageid",
+    "packagetypeid",
+    "outerpackageid",
+    "stockitemid",
+    "_fivetran_deleted",
+    "validto",
+    "stockgroupname",
+    "brand",
+    "size",
+    "barcode",
+    "tags",
+    "supplierreference",
+    "recommendedretailprice",
+    "searchdetails",
+    "suppliername",
+    "packagetypename",
+    "typicalweightperunit",
+    "customfields",
+    "lasteditedby",
+    "stockitemname",
+    "colorname",
+    "stock_groups",
+    "ischillerstock",
+    "unitprice",
+    "validfrom",
+    "taxrate",
+    "marketingcomments",
+    "leadtimedays",
+    "_fivetran_synced",
+    "quantityperouter",
+    "internalcomments"
+  ],
+  "dimension_details": [
+    {
+      "name": "stockgroupid",
+      "included": true,
+      "reason": "join_key",
+      "roles": [
+        "join_key",
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "supplierid",
+      "included": true,
+      "reason": "join_key",
+      "roles": [
+        "join_key"
+      ]
+    },
+    {
+      "name": "colorid",
+      "included": true,
+      "reason": "join_key",
+      "roles": [
+        "join_key"
+      ]
+    },
+    {
+      "name": "unitpackageid",
+      "included": true,
+      "reason": "join_key",
+      "roles": [
+        "join_key"
+      ]
+    },
+    {
+      "name": "packagetypeid",
+      "included": true,
+      "reason": "join_key",
+      "roles": [
+        "join_key"
+      ]
+    },
+    {
+      "name": "outerpackageid",
+      "included": true,
+      "reason": "join_key",
+      "roles": [
+        "join_key"
+      ]
+    },
+    {
+      "name": "stockitemid",
+      "included": true,
+      "reason": "group_by",
+      "roles": [
+        "group_by",
+        "join_key",
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "_fivetran_deleted",
+      "included": true,
+      "reason": "where_filter",
+      "roles": [
+        "metric_ref",
+        "where_filter"
+      ]
+    },
+    {
+      "name": "validto",
+      "included": true,
+      "reason": "where_filter",
+      "roles": [
+        "metric_ref",
+        "where_filter"
+      ]
+    },
+    {
+      "name": "stockgroupname",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "stock_item_name",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "brand",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "size",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "barcode",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "supplier_name",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "supplier_reference",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "color_name",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "is_chiller_stock",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "unit_package_type",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "outer_package_type",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "quantity_per_outer",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "typical_weight_per_unit",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "unit_price",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "recommended_retail_price",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "tax_rate",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "lead_time_days",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "marketing_comments",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "internal_comments",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "search_details",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "tags",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "custom_fields",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "valid_from",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "valid_to",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "last_edited_by",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "last_synced_at",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "is_deleted",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "supplierreference",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "recommendedretailprice",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "searchdetails",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "suppliername",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "packagetypename",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "typicalweightperunit",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "customfields",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "lasteditedby",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "stockitemname",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "colorname",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "stock_groups",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "ischillerstock",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "unitprice",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "validfrom",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "taxrate",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "marketingcomments",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "leadtimedays",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "_fivetran_synced",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "quantityperouter",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "internalcomments",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    }
+  ],
+  "filters": [
+    "si._fivetran_deleted = FALSE AND si.validto > CURRENT_DATE"
+  ],
+  "source_tables": [
+    "final",
+    "stg__warehouse__stockitems",
+    "stg__purchasing__suppliers",
+    "stg__warehouse__colors",
+    "stg__warehouse__packagetypes",
+    "stg__warehouse__stockgroups",
+    "stg__warehouse__stockitemstockgroups",
+    "stock_groups",
+    "stock_items_base",
+    "suppliers",
+    "colors",
+    "package_types_unit",
+    "package_types_outer",
+    "stock_item_groups"
+  ],
+  "entity": {
+    "name": "dim_stock_items",
+    "pk": null,
+    "columns": [
+      "*",
+      "*",
+      "*",
+      "*",
+      "*",
+      "*",
+      "stockgroupid",
+      "stockgroupname",
+      "stockitemid",
+      "stock_groups",
+      "stock_item_id",
+      "stock_item_name",
+      "brand",
+      "size",
+      "barcode",
+      "supplier_name",
+      "supplier_reference",
+      "color_name",
+      "is_chiller_stock",
+      "unit_package_type",
+      "outer_package_type",
+      "quantity_per_outer",
+      "typical_weight_per_unit",
+      "unit_price",
+      "recommended_retail_price",
+      "tax_rate",
+      "stock_groups",
+      "lead_time_days",
+      "marketing_comments",
+      "internal_comments",
+      "search_details",
+      "tags",
+      "custom_fields",
+      "valid_from",
+      "valid_to",
+      "last_edited_by",
+      "last_synced_at",
+      "is_deleted"
+    ]
+  },
+  "relationships": [
+    {
+      "parent_model": "stg__warehouse__stockitems",
+      "child_model": "dim_stock_items",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "stg__purchasing__suppliers",
+      "child_model": "dim_stock_items",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "stg__warehouse__colors",
+      "child_model": "dim_stock_items",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "stg__warehouse__packagetypes",
+      "child_model": "dim_stock_items",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "stg__warehouse__packagetypes",
+      "child_model": "dim_stock_items",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "stg__warehouse__stockgroups",
+      "child_model": "dim_stock_items",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "stg__warehouse__stockitemstockgroups",
+      "child_model": "dim_stock_items",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "stock_groups",
+      "child_model": "stock_item_groups",
+      "fk_column": "stockgroupid",
+      "pk_column": "stockgroupid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "stock_groups",
+      "child_model": "dim_stock_items",
+      "fk_column": "stockgroupid",
+      "pk_column": "stockgroupid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "suppliers",
+      "child_model": "stock_items_base",
+      "fk_column": "supplierid",
+      "pk_column": "supplierid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "suppliers",
+      "child_model": "dim_stock_items",
+      "fk_column": "supplierid",
+      "pk_column": "supplierid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "colors",
+      "child_model": "stock_items_base",
+      "fk_column": "colorid",
+      "pk_column": "colorid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "colors",
+      "child_model": "dim_stock_items",
+      "fk_column": "colorid",
+      "pk_column": "colorid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "package_types_unit",
+      "child_model": "stock_items_base",
+      "fk_column": "unitpackageid",
+      "pk_column": "packagetypeid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "package_types_unit",
+      "child_model": "dim_stock_items",
+      "fk_column": "unitpackageid",
+      "pk_column": "packagetypeid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "package_types_outer",
+      "child_model": "stock_items_base",
+      "fk_column": "outerpackageid",
+      "pk_column": "packagetypeid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "package_types_outer",
+      "child_model": "dim_stock_items",
+      "fk_column": "outerpackageid",
+      "pk_column": "packagetypeid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "stock_item_groups",
+      "child_model": "stock_items_base",
+      "fk_column": "stockitemid",
+      "pk_column": "stockitemid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "stock_item_groups",
+      "child_model": "dim_stock_items",
+      "fk_column": "stockitemid",
+      "pk_column": "stockitemid",
+      "join_type": "INNER"
+    }
+  ]
+}

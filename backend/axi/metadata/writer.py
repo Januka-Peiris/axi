@@ -19,7 +19,15 @@ class MetadataWriter:
             )
         
         if not os.path.exists(self.output_dir):
-            os.makedirs(self.output_dir, exist_ok=True)
+            try:
+                os.makedirs(self.output_dir, exist_ok=True)
+            except FileExistsError:
+                # Some mounts can raise FileExistsError; surface a clearer message if it's not a directory
+                if not os.path.isdir(self.output_dir):
+                    raise ValueError(
+                        f"Metadata path '{self.output_dir}' already exists as a file. "
+                        "Please remove/rename it or set AXI_METADATA_DIR to a directory."
+                    )
 
     def write(self, metadata: Dict[str, Any]):
         model_name = metadata.get("model", "unknown")

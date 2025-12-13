@@ -1,0 +1,424 @@
+{
+  "model": "dim_people",
+  "metrics": [],
+  "dimensions": [
+    "_fivetran_deleted",
+    "validto",
+    "photo",
+    "issalesperson",
+    "ispermittedtologon",
+    "faxnumber",
+    "isexternallogonprovider",
+    "hashedpassword",
+    "searchname",
+    "emailaddress",
+    "phonenumber",
+    "issystemuser",
+    "customfields",
+    "lasteditedby",
+    "preferredname",
+    "otherlanguages",
+    "logonname",
+    "fullname",
+    "validfrom",
+    "personid",
+    "isemployee",
+    "_fivetran_synced"
+  ],
+  "dimension_details": [
+    {
+      "name": "_fivetran_deleted",
+      "included": true,
+      "reason": "where_filter",
+      "roles": [
+        "metric_ref",
+        "where_filter"
+      ]
+    },
+    {
+      "name": "validto",
+      "included": true,
+      "reason": "where_filter",
+      "roles": [
+        "metric_ref",
+        "where_filter"
+      ]
+    },
+    {
+      "name": "person_id",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "full_name",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "preferred_name",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "search_name",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "email_address",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "phone_number",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "fax_number",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "is_salesperson",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "is_employee",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "is_permitted_to_logon",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "is_external_logon_provider",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "is_system_user",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "hashed_password",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "logon_name",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "other_languages",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "custom_fields",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "photo",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "valid_from",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "valid_to",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "last_edited_by",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "last_synced_at",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "is_deleted",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "issalesperson",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "ispermittedtologon",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "faxnumber",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "isexternallogonprovider",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "hashedpassword",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "searchname",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "emailaddress",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "phonenumber",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "issystemuser",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "customfields",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "lasteditedby",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "preferredname",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "otherlanguages",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "logonname",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "fullname",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "validfrom",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "personid",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "isemployee",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "_fivetran_synced",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    }
+  ],
+  "filters": [
+    "_fivetran_deleted = FALSE AND validto > CURRENT_DATE"
+  ],
+  "source_tables": [
+    "final",
+    "stg__application__people",
+    "people_base"
+  ],
+  "entity": {
+    "name": "dim_people",
+    "pk": null,
+    "columns": [
+      "*",
+      "*",
+      "person_id",
+      "full_name",
+      "preferred_name",
+      "search_name",
+      "email_address",
+      "phone_number",
+      "fax_number",
+      "is_salesperson",
+      "is_employee",
+      "is_permitted_to_logon",
+      "is_external_logon_provider",
+      "is_system_user",
+      "hashed_password",
+      "logon_name",
+      "other_languages",
+      "custom_fields",
+      "photo",
+      "valid_from",
+      "valid_to",
+      "last_edited_by",
+      "last_synced_at",
+      "is_deleted"
+    ]
+  },
+  "relationships": [
+    {
+      "parent_model": "stg__application__people",
+      "child_model": "dim_people",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    }
+  ]
+}

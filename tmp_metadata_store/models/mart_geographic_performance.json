@@ -1,0 +1,1296 @@
+{
+  "model": "mart_geographic_performance",
+  "metrics": [
+    {
+      "name": "total_customers",
+      "expression": "COUNT(DISTINCT cg.customer_id)",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "high_value_customers",
+      "expression": "COUNT(DISTINCT CASE WHEN ca.customer_segment IN ('Champions', 'Loyal Customers') THEN cg.customer_id END)",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "active_customers",
+      "expression": "COUNT(DISTINCT CASE WHEN ca.customer_status = 'Active' THEN cg.customer_id END)",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_invoices",
+      "expression": "COUNT(DISTINCT i.invoice_id)",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_units_sold",
+      "expression": "SUM(i.total_quantity)",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_invoice_lines",
+      "expression": "SUM(i.total_lines)",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_revenue_before_tax",
+      "expression": "SUM(i.total_amount_before_tax)",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_tax_amount",
+      "expression": "SUM(i.total_tax_amount)",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_revenue_including_tax",
+      "expression": "SUM(i.total_amount_including_tax)",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_profit",
+      "expression": "SUM(i.total_profit)",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "avg_invoice_value",
+      "expression": "AVG(i.total_amount_including_tax)",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "avg",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "avg_units_per_invoice",
+      "expression": "AVG(i.total_quantity)",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "avg",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "revenue_per_customer",
+      "expression": "SUM(i.total_amount_including_tax) /* Customer value metrics */ / NULLIF(COUNT(DISTINCT cg.customer_id), 0)",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "ratio",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "profit_per_customer",
+      "expression": "SUM(i.total_profit) / NULLIF(COUNT(DISTINCT cg.customer_id), 0)",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "ratio",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "SUM(i.total_profit)",
+      "denominator": "NULLIF(COUNT(DISTINCT cg.customer_id), 0)",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "first_sale_date",
+      "expression": "MIN(i.invoice_date)",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "min",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "last_sale_date",
+      "expression": "MAX(i.invoice_date)",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "max",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "months_with_sales",
+      "expression": "COUNT(DISTINCT TIMESTAMP_TRUNC(i.invoice_date, MONTH))",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "unique_products_sold",
+      "expression": "COUNT(DISTINCT il.stockitemid)",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "profit_margin_percentage",
+      "expression": "CASE WHEN total_revenue_before_tax > 0 THEN (total_profit / total_revenue_before_tax) * 100 ELSE 0 END",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "ratio",
+      "aggregation": "custom",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "CASE WHEN total_revenue_before_tax > 0 THEN (total_profit",
+      "denominator": "total_revenue_before_tax) * 100 ELSE 0 END",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "customer_activity_rate",
+      "expression": "CASE WHEN total_customers > 0 THEN (CAST(active_customers AS FLOAT) / total_customers) * 100 ELSE 0 END",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "ratio",
+      "aggregation": "custom",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "CASE WHEN total_customers > 0 THEN (CAST(active_customers AS FLOAT)",
+      "denominator": "total_customers) * 100 ELSE 0 END",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "high_value_customer_rate",
+      "expression": "CASE WHEN total_customers > 0 THEN (CAST(high_value_customers AS FLOAT) / total_customers) * 100 ELSE 0 END",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "ratio",
+      "aggregation": "custom",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "CASE WHEN total_customers > 0 THEN (CAST(high_value_customers AS FLOAT)",
+      "denominator": "total_customers) * 100 ELSE 0 END",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "avg_invoices_per_month",
+      "expression": "total_invoices /* Market penetration proxy */ / NULLIF(months_with_sales, 0)",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "ratio",
+      "aggregation": "custom",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "cities_count",
+      "expression": "COUNT(DISTINCT city_name)",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "country_total_customers",
+      "expression": "SUM(total_customers)",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "country_total_revenue",
+      "expression": "SUM(total_revenue_including_tax)",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "country_total_profit",
+      "expression": "SUM(total_profit)",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "country_avg_margin",
+      "expression": "AVG(profit_margin_percentage)",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "avg",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "country_unique_products",
+      "expression": "SUM(unique_products_sold)",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "cities_in_state",
+      "expression": "COUNT(DISTINCT city_name)",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "state_total_customers",
+      "expression": "SUM(total_customers)",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "state_total_revenue",
+      "expression": "SUM(total_revenue_including_tax)",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "state_total_profit",
+      "expression": "SUM(total_profit)",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "state_avg_margin",
+      "expression": "AVG(profit_margin_percentage)",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "avg",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "country_market_share_pct",
+      "expression": "CASE WHEN cs.country_total_revenue > 0 THEN (gp.total_revenue_including_tax / cs.country_total_revenue) * 100 ELSE 0 END",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "ratio",
+      "aggregation": "custom",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "CASE WHEN cs.country_total_revenue > 0 THEN (gp.total_revenue_including_tax",
+      "denominator": "cs.country_total_revenue) * 100 ELSE 0 END",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "state_market_share_pct",
+      "expression": "CASE WHEN ss.state_total_revenue > 0 THEN (gp.total_revenue_including_tax / ss.state_total_revenue) * 100 ELSE 0 END",
+      "model": "mart_geographic_performance",
+      "source_table": "mart_geographic_performance",
+      "grain": "unknown",
+      "metric_type": "ratio",
+      "aggregation": "custom",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "CASE WHEN ss.state_total_revenue > 0 THEN (gp.total_revenue_including_tax",
+      "denominator": "ss.state_total_revenue) * 100 ELSE 0 END",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    }
+  ],
+  "dimensions": [
+    "delivery_city_name",
+    "city_name",
+    "customer_id",
+    "country_name",
+    "city_id",
+    "state_province_name",
+    "geographic_region",
+    "sales_territory",
+    "customer_name",
+    "customer_category_name",
+    "revenue_per_customer",
+    "country_total_revenue",
+    "months_with_sales",
+    "total_revenue_including_tax",
+    "revenue_quintile",
+    "country_avg_margin",
+    "total_invoices",
+    "total_tax_amount",
+    "country_total_customers",
+    "total_amount_including_tax",
+    "total_quantity",
+    "customer_quintile",
+    "unique_products_sold",
+    "total_customers",
+    "state_total_revenue",
+    "high_value_customers",
+    "customer_segment",
+    "profit_quintile",
+    "profit_margin_percentage",
+    "invoice_date",
+    "continent",
+    "invoice_id",
+    "customer_activity_rate",
+    "total_revenue_before_tax",
+    "state_total_customers",
+    "margin_quintile",
+    "total_lines",
+    "stockitemid",
+    "customer_status",
+    "total_amount_before_tax",
+    "total_profit",
+    "cities_in_state",
+    "*",
+    "cities_count",
+    "active_customers"
+  ],
+  "dimension_details": [
+    {
+      "name": "delivery_city_name",
+      "included": true,
+      "reason": "join_key",
+      "roles": [
+        "join_key"
+      ]
+    },
+    {
+      "name": "city_name",
+      "included": true,
+      "reason": "group_by",
+      "roles": [
+        "group_by",
+        "join_key",
+        "metric_ref",
+        "where_filter"
+      ]
+    },
+    {
+      "name": "customer_id",
+      "included": true,
+      "reason": "join_key",
+      "roles": [
+        "join_key",
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "country_name",
+      "included": true,
+      "reason": "group_by",
+      "roles": [
+        "group_by",
+        "join_key",
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "city_id",
+      "included": true,
+      "reason": "group_by",
+      "roles": [
+        "group_by",
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "state_province_name",
+      "included": true,
+      "reason": "group_by",
+      "roles": [
+        "group_by",
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "geographic_region",
+      "included": true,
+      "reason": "group_by",
+      "roles": [
+        "group_by",
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "sales_territory",
+      "included": true,
+      "reason": "group_by",
+      "roles": [
+        "group_by",
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "customer_name",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "customer_category_name",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "revenue_rank",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "profit_rank",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "customer_count_rank",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "revenue_per_customer_rank",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "cities_in_country",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "revenue_per_customer",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "country_total_revenue",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "months_with_sales",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "total_revenue_including_tax",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "revenue_quintile",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "country_avg_margin",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "total_invoices",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "total_tax_amount",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "country_total_customers",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "total_amount_including_tax",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "total_quantity",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "customer_quintile",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "unique_products_sold",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "total_customers",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "state_total_revenue",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "high_value_customers",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "customer_segment",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "profit_quintile",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "profit_margin_percentage",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "invoice_date",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "continent",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "invoice_id",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "customer_activity_rate",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "total_revenue_before_tax",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "state_total_customers",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "margin_quintile",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "total_lines",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "stockitemid",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "customer_status",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "total_amount_before_tax",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "total_profit",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "cities_in_state",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "*",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "cities_count",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "active_customers",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    }
+  ],
+  "filters": [
+    "NOT city_name IS NULL /* Only include locations with valid geography */"
+  ],
+  "source_tables": [
+    "final",
+    "dim_customers",
+    "dim_geography",
+    "customer_geography",
+    "fct_sales_invoices",
+    "stg__sales__invoicelines",
+    "mart_customer_analysis",
+    "sales_by_geography",
+    "geographic_performance",
+    "country_summary",
+    "state_summary"
+  ],
+  "entity": {
+    "name": "mart_geographic_performance",
+    "pk": null,
+    "columns": [
+      "*",
+      "customer_id",
+      "customer_name",
+      "customer_category_name",
+      "city_id",
+      "city_name",
+      "state_province_name",
+      "country_name",
+      "geographic_region",
+      "sales_territory",
+      "city_id",
+      "city_name",
+      "state_province_name",
+      "country_name",
+      "geographic_region",
+      "sales_territory",
+      "total_customers",
+      "high_value_customers",
+      "active_customers",
+      "total_invoices",
+      "total_units_sold",
+      "total_invoice_lines",
+      "total_revenue_before_tax",
+      "total_tax_amount",
+      "total_revenue_including_tax",
+      "total_profit",
+      "avg_invoice_value",
+      "avg_units_per_invoice",
+      "revenue_per_customer",
+      "profit_per_customer",
+      "first_sale_date",
+      "last_sale_date",
+      "months_with_sales",
+      "unique_products_sold",
+      "*",
+      "profit_margin_percentage",
+      "customer_activity_rate",
+      "high_value_customer_rate",
+      "avg_invoices_per_month",
+      "revenue_rank",
+      "profit_rank",
+      "customer_count_rank",
+      "revenue_per_customer_rank",
+      "revenue_quintile",
+      "profit_quintile",
+      "customer_quintile",
+      "margin_quintile",
+      "country_name",
+      "geographic_region",
+      "cities_count",
+      "country_total_customers",
+      "country_total_revenue",
+      "country_total_profit",
+      "country_avg_margin",
+      "country_unique_products",
+      "country_name",
+      "state_province_name",
+      "sales_territory",
+      "cities_in_state",
+      "state_total_customers",
+      "state_total_revenue",
+      "state_total_profit",
+      "state_avg_margin",
+      "*",
+      "country_total_customers",
+      "country_total_revenue",
+      "country_avg_margin",
+      "cities_in_country",
+      "state_total_customers",
+      "state_total_revenue",
+      "cities_in_state",
+      "country_market_share_pct",
+      "state_market_share_pct",
+      "performance_tier",
+      "market_maturity",
+      "strategic_priority"
+    ]
+  },
+  "relationships": [
+    {
+      "parent_model": "dim_customers",
+      "child_model": "mart_geographic_performance",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "dim_geography",
+      "child_model": "mart_geographic_performance",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "fct_sales_invoices",
+      "child_model": "mart_geographic_performance",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "stg__sales__invoicelines",
+      "child_model": "mart_geographic_performance",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "mart_customer_analysis",
+      "child_model": "mart_geographic_performance",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "dim_geography",
+      "child_model": "dim_customers",
+      "fk_column": "delivery_city_name",
+      "pk_column": "city_name",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "mart_customer_analysis",
+      "child_model": "customer_geography",
+      "fk_column": "customer_id",
+      "pk_column": "customer_id",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "country_summary",
+      "child_model": "geographic_performance",
+      "fk_column": "country_name",
+      "pk_column": "country_name",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "country_summary",
+      "child_model": "mart_geographic_performance",
+      "fk_column": "country_name",
+      "pk_column": "country_name",
+      "join_type": "INNER"
+    }
+  ]
+}

@@ -4,48 +4,174 @@
 
 import os
 import pathlib
-from typing import Optional
+from typing import Optional, Literal
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pathlib import Path
+from axi.config.env_loader import find_project_root
 
-class Settings:
-    _instance = None
 
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(Settings, cls).__new__(cls)
-            cls._instance._load()
-        return cls._instance
-
-    def _load(self):
-        # Dynamic path resolution: find 'metadata_store' relative to this file
-        # File: backend/axi/config/settings.py
-        # Root: ../../../  (backend/axi/config -> backend/axi -> backend -> ROOT)
+class AXISettings(BaseSettings):
+    """
+    Application-level settings for AXI.
+    Loads from environment variables with AXI_ prefix or .env files.
+    """
+    
+    model_config = SettingsConfigDict(
+        env_prefix="AXI_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+        env_ignore_empty=True,
+    )
+    
+    # Metadata directory
+    metadata_dir: str = Field(
+        default="",
+        description="Directory for storing metadata (models, entities, metrics). "
+                   "If not set, auto-detected from project structure."
+    )
+    
+    # Environment
+    env: Literal["dev", "staging", "prod", "local"] = Field(
+        default="local",
+        description="Environment name (dev, staging, prod, local)"
+    )
+    
+    # Logging
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(
+        default="INFO",
+        description="Logging level"
+    )
+    log_file: Optional[str] = Field(
+        default=None,
+        description="Path to log file. If None, logs only to console."
+    )
+    log_json: bool = Field(
+        default=False,
+        description="Use JSON format for structured logging"
+    )
+    
+    # API settings
+    api_host: str = Field(
+        default="0.0.0.0",
+        description="API server host"
+    )
+    api_port: int = Field(
+        default=8000,
+        ge=1,
+        le=65535,
+        description="API server port"
+    )
+    
+    # Feature flags
+    demo_mode: bool = Field(
+        default=False,
+        description="Enable demo mode (restricted features)"
+    )
+    debug: bool = Field(
+        default=False,
+        description="Enable debug mode (verbose output)"
+    )
+    
+    # Database configuration
+    db_type: Literal["sqlite", "postgres"] = Field(
+        default="sqlite",
+        description="Database type: sqlite (embedded) or postgres (server)"
+    )
+    db_url: Optional[str] = Field(
+        default=None,
+        description="Database connection URL (for PostgreSQL, overrides individual settings)"
+    )
+    db_host: Optional[str] = Field(
+        default=None,
+        description="Database host (for PostgreSQL)"
+    )
+    db_port: int = Field(
+        default=5432,
+        ge=1,
+        le=65535,
+        description="Database port (for PostgreSQL)"
+    )
+    db_name: Optional[str] = Field(
+        default="axi",
+        description="Database name (for PostgreSQL)"
+    )
+    db_user: Optional[str] = Field(
+        default=None,
+        description="Database user (for PostgreSQL)"
+    )
+    db_password: Optional[str] = Field(
+        default=None,
+        description="Database password (for PostgreSQL, use env: syntax in config)"
+    )
+    
+    @field_validator('metadata_dir', mode='before')
+    @classmethod
+    def resolve_metadata_dir(cls, v: Optional[str]) -> str:
+        """Auto-detect metadata directory if not provided."""
+        if v and v.strip():
+            return v.strip()
         
-        current_file = pathlib.Path(__file__).resolve()
-        # Traverse up to find directory containing 'metadata_store' or fall back to known structure
-        # Start from parent dir
-        project_root = None
-        current = current_file.parent
+        # Prefer project root relative to the current working directory
+        project_root = find_project_root()
+        if project_root:
+            return str(project_root / "metadata_store")
         
-        # Traverse up to 5 levels to find 'metadata_store' or 'axi.yml' marker
-        for _ in range(5):
-            if (current / "metadata_store").exists():
-                project_root = current
-                break
-            if current.parent == current: # Reached file system root
-                break
-            current = current.parent
-            
-        if not project_root:
-             # Fallback: assume standard structure: backend/axi/config/settings.py -> ROOT is 3 levels up
-             # config -> axi -> backend -> ROOT
-             project_root = current_file.parents[3]
+        # Fallback: use metadata_store under the current working directory
+        return str(pathlib.Path.cwd() / "metadata_store")
+    
+    @field_validator('log_file')
+    @classmethod
+    def validate_log_file(cls, v: Optional[str]) -> Optional[str]:
+        """Validate log file path."""
+        if v:
+            log_path = Path(v)
+            # Create parent directory if it doesn't exist
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            return str(log_path.resolve())
+        return v
+    
+    @property
+    def AXI_METADATA_DIR(self) -> str:
+        """Backward compatibility property."""
+        return self.metadata_dir
+    
+    @property
+    def AXI_DEMO_MODE(self) -> bool:
+        """Backward compatibility property."""
+        return self.demo_mode
+    
+    @property
+    def LOG_LEVEL(self) -> str:
+        """Backward compatibility property."""
+        return self.log_level
+    
+    def reload(self) -> None:
+        """Reload settings from environment."""
+        # Create new instance to reload
+        global _settings_instance
+        _settings_instance = None
+        get_settings()
 
-        self.AXI_METADATA_DIR = os.getenv("AXI_METADATA_DIR", str(project_root / "metadata_store"))
-        self.AXI_DEMO_MODE = os.getenv("AXI_DEMO_MODE", "false").lower() == "true"
-        self.LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
-    def reload(self):
-        self._load()
+# Singleton instance
+_settings_instance: Optional[AXISettings] = None
 
-def get_settings():
-    return Settings()
+
+def get_settings() -> AXISettings:
+    """
+    Get the singleton settings instance.
+    
+    Returns:
+        AXISettings instance
+    """
+    global _settings_instance
+    if _settings_instance is None:
+        _settings_instance = AXISettings()
+    return _settings_instance
+
+
+# Backward compatibility alias
+Settings = AXISettings

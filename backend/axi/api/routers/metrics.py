@@ -3,7 +3,7 @@
 # Change Date: 2027-01-01. Change License: MIT.
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Dict, Any, Optional
 import sqlite3
 import json
@@ -14,9 +14,12 @@ from axi.query.engine import SemanticQueryEngine
 from axi.execution.snowflake_runner import SnowflakeRunner
 from axi.metrics.store import MetricStore
 from axi.metrics.validator import MetricValidator
+from axi.utils.logging_config import get_logger
+from axi.exceptions import DatabaseError, MetadataError, ValidationError
 
 router = APIRouter(prefix="/api/metrics", tags=["metrics"])
 settings = get_settings()
+logger = get_logger(__name__)
 
 def _get_indexer():
     return MetadataIndexer(settings.AXI_METADATA_DIR)
@@ -93,6 +96,7 @@ def list_metrics():
     List all metrics with entity information.
     Returns: List of metrics with id, name, entity_name, type, expression, default_dimensions, description
     """
+    logger.debug("Listing all metrics")
     indexer = _get_indexer()
     try:
         with indexer._get_conn() as conn:
@@ -132,15 +136,32 @@ def list_metrics():
                     result.append(row_dict)
                 return result
             except sqlite3.OperationalError as e:
-                return []
+                logger.warning(f"Database error listing metrics: {e}")
+                raise DatabaseError(f"Database error listing metrics: {e}", code="DATABASE_ERROR")
+    except DatabaseError:
+        raise
     except Exception as e:
-        return []
+        logger.error(f"Unexpected error listing metrics: {e}")
+        raise MetadataError(f"Failed to list metrics: {e}", code="METRICS_LIST_ERROR")
 
 @router.get("/{metric_id}")
 def get_metric(metric_id: str):
     """
     Get a single metric by ID (integer) or name (string) with full metadata.
     """
+    logger.debug(f"Getting metric: {metric_id}")
+    # Validate metric_id input
+    from axi.utils.sanitization import validate_metric_name, sanitize_string
+    try:
+        # If it's numeric, it's an ID, otherwise validate as metric name
+        int(metric_id)  # Try to parse as int
+    except ValueError:
+        # It's a metric name, validate it
+        try:
+            metric_id = validate_metric_name(metric_id)
+        except ValueError as ve:
+            raise ValidationError(str(ve), code="INVALID_METRIC_NAME")
+    
     indexer = _get_indexer()
     try:
         with indexer._get_conn() as conn:
@@ -230,6 +251,7 @@ def get_metric_dimensions(metric_id: str):
     """
     Get all dimensions linked to a metric.
     """
+    logger.debug(f"Getting dimensions for metric: {metric_id}")
     indexer = _get_indexer()
     try:
         with indexer._get_conn() as conn:
@@ -266,7 +288,8 @@ def get_metric_dimensions(metric_id: str):
                 rows = c.fetchall()
                 result = [dict(row) for row in rows]
                 return result
-            except sqlite3.OperationalError:
+            except sqlite3.OperationalError as e:
+                logger.warning(f"Database error getting metric dimensions: {e}")
                 # Fallback: get dimensions from metrics.dimensions JSON
                 c.execute("SELECT dimensions FROM metrics WHERE name = ?", (metric_name,))
                 row = c.fetchone()
@@ -282,14 +305,19 @@ def get_metric_dimensions(metric_id: str):
                 return []
     except HTTPException:
         raise
+    except DatabaseError as e:
+        logger.warning(f"Database error getting metric dimensions: {e}")
+        raise HTTPException(status_code=500, detail=e.to_dict())
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        logger.error(f"Unexpected error getting metric dimensions: {e}")
+        raise HTTPException(status_code=500, detail=MetadataError(f"Failed to get metric dimensions: {e}", code="METRIC_DIMENSIONS_ERROR").to_dict())
 
 @router.get("/{metric_id}/entities")
 def get_metric_entities(metric_id: str):
     """
     Get all entities linked to a metric.
     """
+    logger.debug(f"Getting entities for metric: {metric_id}")
     indexer = _get_indexer()
     try:
         with indexer._get_conn() as conn:
@@ -349,6 +377,7 @@ def run_semantic_query(req: SemanticQueryRequest):
     """
     Run a semantic query and return generated SQL with preview.
     """
+    logger.info(f"Running semantic query for metrics: {req.metrics}")
     indexer = _get_indexer()
     engine = SemanticQueryEngine(indexer)
     
@@ -367,22 +396,33 @@ def run_semantic_query(req: SemanticQueryRequest):
             runner = SnowflakeRunner()
             rows, columns = runner.execute_query(f"{sql} LIMIT 20")
             preview = rows
-        except Exception as e:
+        except ValueError:
             # If Snowflake not configured, just return SQL
-            pass
+            logger.debug("Snowflake not configured, returning SQL only")
+        except Exception as e:
+            logger.debug(f"Snowflake execution error (non-fatal): {e}")
         
         return {
             "sql": sql,
             "preview": preview
         }
+    except QueryError as e:
+        logger.warning(f"Query error in semantic query: {e}")
+        raise HTTPException(status_code=400, detail=e.to_dict())
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"Unexpected error in semantic query: {e}")
+        raise HTTPException(status_code=400, detail=QueryError(f"Failed to run semantic query: {e}", code="SEMANTIC_QUERY_ERROR").to_dict())
 
 @router.get("/{metric_id}/sample")
 def get_metric_sample(metric_id: str, limit: int = 20):
     """
     Get sample values for a metric with default dimensions.
     """
+    logger.debug(f"Getting sample for metric: {metric_id}, limit: {limit}")
+    # Validate limit
+    if limit < 1 or limit > 1000:
+        raise ValidationError("Limit must be between 1 and 1000", code="INVALID_LIMIT")
+    
     indexer = _get_indexer()
     try:
         with indexer._get_conn() as conn:
@@ -420,16 +460,27 @@ def get_metric_sample(metric_id: str, limit: int = 20):
                 "columns": columns,
                 "rows": rows
             }
-        except Exception as e:
+        except ValueError:
             # If Snowflake not configured, return empty
+            logger.debug("Snowflake not configured for metric sample")
+            return {
+                "columns": [],
+                "rows": []
+            }
+        except Exception as e:
+            logger.debug(f"Snowflake execution error for sample (non-fatal): {e}")
             return {
                 "columns": [],
                 "rows": []
             }
     except HTTPException:
         raise
+    except DatabaseError as e:
+        logger.warning(f"Database error getting metric sample: {e}")
+        raise HTTPException(status_code=500, detail=e.to_dict())
     except Exception as e:
-        # If any error occurs, return empty
+        logger.error(f"Unexpected error getting metric sample: {e}")
+        # Return empty on error to prevent breaking UI
         return {
             "columns": [],
             "rows": []
@@ -446,6 +497,31 @@ class CreateMetricRequest(BaseModel):
     grain: Optional[List[str]] = Field(None, description="Fixed grain override (list of dimension names)")
     dimensions: Optional[List[str]] = Field(None, description="Allowed dimensions for slicing")
     tags: Optional[List[str]] = Field(None, description="Tags for categorization")
+    
+    @field_validator('metric')
+    @classmethod
+    def validate_metric(cls, v: str) -> str:
+        from axi.utils.sanitization import validate_metric_name
+        return validate_metric_name(v)
+    
+    @field_validator('description')
+    @classmethod
+    def validate_description(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            from axi.utils.sanitization import sanitize_string
+            return sanitize_string(v, max_length=1000)
+        return v
+    
+    @field_validator('dimensions')
+    @classmethod
+    def validate_dimensions(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        if v:
+            from axi.utils.sanitization import validate_dimension_name
+            validated = []
+            for dim in v:
+                validated.append(validate_dimension_name(dim))
+            return validated
+        return v
 
 class UpdateMetricRequest(BaseModel):
     description: Optional[str] = None
@@ -455,6 +531,25 @@ class UpdateMetricRequest(BaseModel):
     grain: Optional[List[str]] = None
     dimensions: Optional[List[str]] = None
     tags: Optional[List[str]] = None
+    
+    @field_validator('description')
+    @classmethod
+    def validate_description(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            from axi.utils.sanitization import sanitize_string
+            return sanitize_string(v, max_length=1000)
+        return v
+    
+    @field_validator('dimensions')
+    @classmethod
+    def validate_dimensions(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        if v:
+            from axi.utils.sanitization import validate_dimension_name
+            validated = []
+            for dim in v:
+                validated.append(validate_dimension_name(dim))
+            return validated
+        return v
 
 def _get_metric_store():
     """Get metric store instance."""
@@ -478,19 +573,29 @@ def create_metric(req: CreateMetricRequest):
     """
     Create a new user-defined metric.
     """
+    logger.info(f"Creating metric: {req.metric}")
+    # Validate metric name
+    from axi.utils.sanitization import validate_metric_name
+    try:
+        validated_name = validate_metric_name(req.metric)
+    except ValueError as ve:
+        raise ValidationError(str(ve), code="INVALID_METRIC_NAME")
+    
     indexer = _get_indexer()
     validator = MetricValidator(indexer)
     store = _get_metric_store()
     
     # Convert request to dict
     metric_data = req.dict(exclude_none=True)
+    metric_data["metric"] = validated_name  # Use validated name
     metric_data["created_at"] = datetime.utcnow().isoformat()
     metric_data["updated_at"] = datetime.utcnow().isoformat()
     
     # Validate
     is_valid, errors = validator.validate(metric_data)
     if not is_valid:
-        raise HTTPException(status_code=400, detail={"errors": errors})
+        logger.warning(f"Validation failed for metric {req.metric}: {errors}")
+        raise HTTPException(status_code=400, detail=ValidationError("Metric validation failed", code="VALIDATION_ERROR", context={"errors": errors}).to_dict())
     
     # Infer type from expression if not provided
     if not metric_data.get("type"):
@@ -516,29 +621,42 @@ def create_metric(req: CreateMetricRequest):
     try:
         # Create metric
         created = store.create(metric_data)
+        logger.info(f"Successfully created metric: {req.metric}")
         
         # Rebuild metadata index to include new metric
         indexer.build_index()
         
         return created
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.warning(f"Validation error creating metric: {e}")
+        raise HTTPException(status_code=400, detail=ValidationError(str(e), code="VALIDATION_ERROR").to_dict())
+    except MetadataError as e:
+        raise HTTPException(status_code=400, detail=e.to_dict())
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create metric: {str(e)}")
+        logger.error(f"Unexpected error creating metric: {e}")
+        raise HTTPException(status_code=500, detail=MetadataError(f"Failed to create metric: {e}", code="METRIC_CREATE_ERROR").to_dict())
 
 @router.put("/{metric_name}")
 def update_metric(metric_name: str, req: UpdateMetricRequest):
     """
     Update an existing user-defined metric.
     """
+    logger.info(f"Updating metric: {metric_name}")
+    # Validate metric name
+    from axi.utils.sanitization import validate_metric_name
+    try:
+        validated_name = validate_metric_name(metric_name)
+    except ValueError as ve:
+        raise ValidationError(str(ve), code="INVALID_METRIC_NAME")
+    
     indexer = _get_indexer()
     validator = MetricValidator(indexer)
     store = _get_metric_store()
     
     # Get existing metric
-    existing = store.get(metric_name)
+    existing = store.get(validated_name)
     if not existing:
-        raise HTTPException(status_code=404, detail=f"Metric '{metric_name}' not found")
+        raise HTTPException(status_code=404, detail=MetadataError(f"Metric '{validated_name}' not found", code="METRIC_NOT_FOUND").to_dict())
     
     # Merge updates
     updates = req.dict(exclude_none=True)
@@ -549,43 +667,61 @@ def update_metric(metric_name: str, req: UpdateMetricRequest):
     # Validate
     is_valid, errors = validator.validate(updated_data)
     if not is_valid:
-        raise HTTPException(status_code=400, detail={"errors": errors})
+        logger.warning(f"Validation failed for metric update {validated_name}: {errors}")
+        raise HTTPException(status_code=400, detail=ValidationError("Metric validation failed", code="VALIDATION_ERROR", context={"errors": errors}).to_dict())
     
     try:
         # Update metric
-        updated = store.update(metric_name, updates)
+        updated = store.update(validated_name, updates)
+        logger.info(f"Successfully updated metric: {validated_name}")
         
         # Rebuild metadata index
         indexer.build_index()
         
         return updated
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.warning(f"Validation error updating metric: {e}")
+        raise HTTPException(status_code=400, detail=ValidationError(str(e), code="VALIDATION_ERROR").to_dict())
+    except MetadataError as e:
+        raise HTTPException(status_code=400, detail=e.to_dict())
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to update metric: {str(e)}")
+        logger.error(f"Unexpected error updating metric: {e}")
+        raise HTTPException(status_code=500, detail=MetadataError(f"Failed to update metric: {e}", code="METRIC_UPDATE_ERROR").to_dict())
 
 @router.delete("/{metric_name}")
 def delete_metric(metric_name: str):
     """
     Delete a user-defined metric.
     """
+    logger.info(f"Deleting metric: {metric_name}")
+    # Validate metric name
+    from axi.utils.sanitization import validate_metric_name
+    try:
+        validated_name = validate_metric_name(metric_name)
+    except ValueError as ve:
+        raise ValidationError(str(ve), code="INVALID_METRIC_NAME")
+    
     store = _get_metric_store()
     indexer = _get_indexer()
     
-    if not store.get(metric_name):
-        raise HTTPException(status_code=404, detail=f"Metric '{metric_name}' not found")
+    if not store.get(validated_name):
+        raise HTTPException(status_code=404, detail=MetadataError(f"Metric '{validated_name}' not found", code="METRIC_NOT_FOUND").to_dict())
     
     try:
-        store.delete(metric_name)
+        store.delete(validated_name)
+        logger.info(f"Successfully deleted metric: {validated_name}")
         
         # Rebuild metadata index
         indexer.build_index()
         
-        return {"status": "deleted", "metric": metric_name}
+        return {"status": "deleted", "metric": validated_name}
     except HTTPException:
         raise
+    except MetadataError as e:
+        raise HTTPException(status_code=400, detail=e.to_dict())
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to delete metric: {str(e)}")
+        logger.error(f"Unexpected error deleting metric: {e}")
+        raise HTTPException(status_code=500, detail=MetadataError(f"Failed to delete metric: {e}", code="METRIC_DELETE_ERROR").to_dict())
 
 @router.get("/{metric_name}/allowed-dimensions")
 def get_allowed_dimensions(metric_name: str):
@@ -593,12 +729,20 @@ def get_allowed_dimensions(metric_name: str):
     Get allowed dimensions for a metric based on grain.
     Returns: {"dimensions": ["dim1", "dim2", ...], "grain": ["grain1", ...]}
     """
+    logger.debug(f"Getting allowed dimensions for metric: {metric_name}")
+    # Validate metric name
+    from axi.utils.sanitization import validate_metric_name
+    try:
+        validated_name = validate_metric_name(metric_name)
+    except ValueError as ve:
+        raise ValidationError(str(ve), code="INVALID_METRIC_NAME")
+    
     indexer = _get_indexer()
     engine = SemanticQueryEngine(indexer)
     
-    metric = indexer.get_metric(metric_name)
+    metric = indexer.get_metric(validated_name)
     if not metric:
-        raise HTTPException(status_code=404, detail=f"Metric '{metric_name}' not found")
+        raise HTTPException(status_code=404, detail=MetadataError(f"Metric '{validated_name}' not found", code="METRIC_NOT_FOUND").to_dict())
     
     # Get effective grain
     entity = None
@@ -607,11 +751,11 @@ def get_allowed_dimensions(metric_name: str):
         entity = indexer.get_entity(entity_name)
     
     effective_grain = engine.get_effective_grain(metric, entity)
-    allowed_dims = engine.get_allowed_dimensions_for_metric(metric_name)
+    allowed_dims = engine.get_allowed_dimensions_for_metric(validated_name)
     
     return {
         "dimensions": allowed_dims,
         "grain": effective_grain,
-        "metric": metric_name
+        "metric": validated_name
     }
 

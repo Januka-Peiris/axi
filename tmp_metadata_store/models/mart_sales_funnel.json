@@ -1,0 +1,849 @@
+{
+  "model": "mart_sales_funnel",
+  "metrics": [
+    {
+      "name": "total_orders",
+      "expression": "COUNT(DISTINCT o.order_id)",
+      "model": "mart_sales_funnel",
+      "source_table": "mart_sales_funnel",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_order_value",
+      "expression": "SUM(o.total_amount_including_tax)",
+      "model": "mart_sales_funnel",
+      "source_table": "mart_sales_funnel",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "avg_order_value",
+      "expression": "AVG(o.total_amount_including_tax)",
+      "model": "mart_sales_funnel",
+      "source_table": "mart_sales_funnel",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "avg",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "orders_picked",
+      "expression": "COUNT(DISTINCT CASE WHEN NOT o.picking_completed_when IS NULL THEN o.order_id END)",
+      "model": "mart_sales_funnel",
+      "source_table": "mart_sales_funnel",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "orders_invoiced",
+      "expression": "COUNT(DISTINCT CASE WHEN NOT i.invoice_id IS NULL THEN o.order_id END)",
+      "model": "mart_sales_funnel",
+      "source_table": "mart_sales_funnel",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "invoiced_value",
+      "expression": "SUM(CASE WHEN NOT i.invoice_id IS NULL THEN i.total_amount_including_tax ELSE 0 END)",
+      "model": "mart_sales_funnel",
+      "source_table": "mart_sales_funnel",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "invoiced_profit",
+      "expression": "SUM(CASE WHEN NOT i.invoice_id IS NULL THEN i.total_profit ELSE 0 END)",
+      "model": "mart_sales_funnel",
+      "source_table": "mart_sales_funnel",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "unique_customers_ordered",
+      "expression": "COUNT(DISTINCT o.customer_id)",
+      "model": "mart_sales_funnel",
+      "source_table": "mart_sales_funnel",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "unique_customers_invoiced",
+      "expression": "COUNT(DISTINCT CASE WHEN NOT i.invoice_id IS NULL THEN o.customer_id END)",
+      "model": "mart_sales_funnel",
+      "source_table": "mart_sales_funnel",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "pick_conversion_rate",
+      "expression": "CASE WHEN total_orders > 0 THEN (CAST(orders_picked AS FLOAT) / total_orders) * 100 ELSE 0 END",
+      "model": "mart_sales_funnel",
+      "source_table": "mart_sales_funnel",
+      "grain": "unknown",
+      "metric_type": "ratio",
+      "aggregation": "custom",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "CASE WHEN total_orders > 0 THEN (CAST(orders_picked AS FLOAT)",
+      "denominator": "total_orders) * 100 ELSE 0 END",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "invoice_conversion_rate",
+      "expression": "CASE WHEN total_orders > 0 THEN (CAST(orders_invoiced AS FLOAT) / total_orders) * 100 ELSE 0 END",
+      "model": "mart_sales_funnel",
+      "source_table": "mart_sales_funnel",
+      "grain": "unknown",
+      "metric_type": "ratio",
+      "aggregation": "custom",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "CASE WHEN total_orders > 0 THEN (CAST(orders_invoiced AS FLOAT)",
+      "denominator": "total_orders) * 100 ELSE 0 END",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "picked_to_invoice_rate",
+      "expression": "CASE WHEN orders_picked > 0 THEN (CAST(orders_invoiced AS FLOAT) / orders_picked) * 100 ELSE 0 END",
+      "model": "mart_sales_funnel",
+      "source_table": "mart_sales_funnel",
+      "grain": "unknown",
+      "metric_type": "ratio",
+      "aggregation": "custom",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "CASE WHEN orders_picked > 0 THEN (CAST(orders_invoiced AS FLOAT)",
+      "denominator": "orders_picked) * 100 ELSE 0 END",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "value_conversion_rate",
+      "expression": "CASE WHEN total_order_value > 0 THEN (invoiced_value / total_order_value) * 100 ELSE 0 END",
+      "model": "mart_sales_funnel",
+      "source_table": "mart_sales_funnel",
+      "grain": "unknown",
+      "metric_type": "ratio",
+      "aggregation": "custom",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "CASE WHEN total_order_value > 0 THEN (invoiced_value",
+      "denominator": "total_order_value) * 100 ELSE 0 END",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "customer_conversion_rate",
+      "expression": "CASE WHEN unique_customers_ordered > 0 THEN (CAST(unique_customers_invoiced AS FLOAT) / unique_customers_ordered) * 100 ELSE 0 END",
+      "model": "mart_sales_funnel",
+      "source_table": "mart_sales_funnel",
+      "grain": "unknown",
+      "metric_type": "ratio",
+      "aggregation": "custom",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "CASE WHEN unique_customers_ordered > 0 THEN (CAST(unique_customers_invoiced AS FLOAT)",
+      "denominator": "unique_customers_ordered) * 100 ELSE 0 END",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "avg_converted_order_value",
+      "expression": "CASE WHEN orders_invoiced > 0 THEN invoiced_value / orders_invoiced ELSE 0 END",
+      "model": "mart_sales_funnel",
+      "source_table": "mart_sales_funnel",
+      "grain": "unknown",
+      "metric_type": "ratio",
+      "aggregation": "custom",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "CASE WHEN orders_invoiced > 0 THEN invoiced_value",
+      "denominator": "orders_invoiced ELSE 0 END",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "avg_profit_per_converted_order",
+      "expression": "CASE WHEN orders_invoiced > 0 THEN invoiced_profit / orders_invoiced ELSE 0 END",
+      "model": "mart_sales_funnel",
+      "source_table": "mart_sales_funnel",
+      "grain": "unknown",
+      "metric_type": "ratio",
+      "aggregation": "custom",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "CASE WHEN orders_invoiced > 0 THEN invoiced_profit",
+      "denominator": "orders_invoiced ELSE 0 END",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "converted_order_profit_margin",
+      "expression": "CASE WHEN invoiced_value > 0 THEN (invoiced_profit / invoiced_value) * 100 ELSE 0 END",
+      "model": "mart_sales_funnel",
+      "source_table": "mart_sales_funnel",
+      "grain": "unknown",
+      "metric_type": "ratio",
+      "aggregation": "custom",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "CASE WHEN invoiced_value > 0 THEN (invoiced_profit",
+      "denominator": "invoiced_value) * 100 ELSE 0 END",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "funnel_efficiency_score",
+      "expression": "(pick_conversion_rate + invoice_conversion_rate + value_conversion_rate) /* Funnel efficiency score (composite metric) */ / 3",
+      "model": "mart_sales_funnel",
+      "source_table": "mart_sales_funnel",
+      "grain": "unknown",
+      "metric_type": "ratio",
+      "aggregation": "custom",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    }
+  ],
+  "dimensions": [
+    "customer_id",
+    "salesperson_id",
+    "person_id",
+    "order_id",
+    "order_date",
+    "salesperson_name",
+    "customer_category_name",
+    "is_deleted",
+    "funnel_date",
+    "customer_name",
+    "buying_group_name",
+    "picking_completed_when",
+    "avg_order_value",
+    "avg_profit_per_converted_order",
+    "value_conversion_rate",
+    "converted_order_profit_margin",
+    "total_amount_including_tax",
+    "pick_conversion_rate",
+    "picked_to_invoice_rate",
+    "invoiced_value",
+    "orders_picked",
+    "total_order_value",
+    "avg_converted_order_value",
+    "unique_customers_invoiced",
+    "customer_conversion_rate",
+    "unique_customers_ordered",
+    "total_orders",
+    "invoice_id",
+    "invoice_conversion_rate",
+    "total_profit",
+    "full_name",
+    "*",
+    "orders_invoiced",
+    "invoiced_profit"
+  ],
+  "dimension_details": [
+    {
+      "name": "customer_id",
+      "included": true,
+      "reason": "join_key",
+      "roles": [
+        "join_key",
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "salesperson_id",
+      "included": true,
+      "reason": "group_by",
+      "roles": [
+        "group_by",
+        "join_key",
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "person_id",
+      "included": true,
+      "reason": "join_key",
+      "roles": [
+        "join_key"
+      ]
+    },
+    {
+      "name": "order_id",
+      "included": true,
+      "reason": "join_key",
+      "roles": [
+        "join_key",
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "order_date",
+      "included": true,
+      "reason": "group_by",
+      "roles": [
+        "group_by",
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "salesperson_name",
+      "included": true,
+      "reason": "group_by",
+      "roles": [
+        "group_by",
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "customer_category_name",
+      "included": true,
+      "reason": "group_by",
+      "roles": [
+        "group_by",
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "is_deleted",
+      "included": true,
+      "reason": "where_filter",
+      "roles": [
+        "where_filter"
+      ]
+    },
+    {
+      "name": "funnel_date",
+      "included": true,
+      "reason": "where_filter",
+      "roles": [
+        "metric_ref",
+        "select_only",
+        "where_filter"
+      ]
+    },
+    {
+      "name": "customer_name",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "buying_group_name",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "year",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "month",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "picking_completed_when",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "avg_order_value",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "avg_profit_per_converted_order",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "value_conversion_rate",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "converted_order_profit_margin",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "total_amount_including_tax",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "pick_conversion_rate",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "picked_to_invoice_rate",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "invoiced_value",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "orders_picked",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "total_order_value",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "avg_converted_order_value",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "unique_customers_invoiced",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "customer_conversion_rate",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "unique_customers_ordered",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "total_orders",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "invoice_id",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "invoice_conversion_rate",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "total_profit",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "full_name",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "*",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "orders_invoiced",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "invoiced_profit",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    }
+  ],
+  "filters": [
+    "o.is_deleted = FALSE"
+  ],
+  "source_tables": [
+    "final",
+    "fct_sales_orders",
+    "dim_customers",
+    "dim_people",
+    "fct_sales_invoices",
+    "orders_base",
+    "invoices_base",
+    "monthly_funnel",
+    "funnel_metrics"
+  ],
+  "entity": {
+    "name": "mart_sales_funnel",
+    "pk": null,
+    "columns": [
+      "*",
+      "*",
+      "customer_name",
+      "customer_category_name",
+      "buying_group_name",
+      "salesperson_name",
+      "*",
+      "customer_name",
+      "customer_category_name",
+      "salesperson_name",
+      "funnel_date",
+      "salesperson_id",
+      "salesperson_name",
+      "customer_category_name",
+      "total_orders",
+      "total_order_value",
+      "avg_order_value",
+      "orders_picked",
+      "orders_invoiced",
+      "invoiced_value",
+      "invoiced_profit",
+      "unique_customers_ordered",
+      "unique_customers_invoiced",
+      "*",
+      "pick_conversion_rate",
+      "invoice_conversion_rate",
+      "picked_to_invoice_rate",
+      "value_conversion_rate",
+      "customer_conversion_rate",
+      "avg_converted_order_value",
+      "avg_profit_per_converted_order",
+      "converted_order_profit_margin",
+      "funnel_date",
+      "salesperson_id",
+      "salesperson_name",
+      "customer_category_name",
+      "total_orders",
+      "orders_picked",
+      "orders_invoiced",
+      "unique_customers_ordered",
+      "unique_customers_invoiced",
+      "total_order_value",
+      "invoiced_value",
+      "invoiced_profit",
+      "avg_order_value",
+      "avg_converted_order_value",
+      "avg_profit_per_converted_order",
+      "pick_conversion_rate",
+      "invoice_conversion_rate",
+      "picked_to_invoice_rate",
+      "value_conversion_rate",
+      "customer_conversion_rate",
+      "converted_order_profit_margin",
+      "funnel_efficiency_score",
+      "year",
+      "month",
+      "year_month_label",
+      "month_name"
+    ]
+  },
+  "relationships": [
+    {
+      "parent_model": "fct_sales_orders",
+      "child_model": "mart_sales_funnel",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "dim_customers",
+      "child_model": "mart_sales_funnel",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "dim_people",
+      "child_model": "mart_sales_funnel",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "fct_sales_invoices",
+      "child_model": "mart_sales_funnel",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "dim_customers",
+      "child_model": "mart_sales_funnel",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "dim_people",
+      "child_model": "mart_sales_funnel",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "dim_customers",
+      "child_model": "orders_base",
+      "fk_column": "customer_id",
+      "pk_column": "customer_id",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "dim_people",
+      "child_model": "orders_base",
+      "fk_column": "salesperson_id",
+      "pk_column": "person_id",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "dim_customers",
+      "child_model": "invoices_base",
+      "fk_column": "customer_id",
+      "pk_column": "customer_id",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "dim_people",
+      "child_model": "invoices_base",
+      "fk_column": "salesperson_id",
+      "pk_column": "person_id",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "invoices_base",
+      "child_model": "orders_base",
+      "fk_column": "order_id",
+      "pk_column": "order_id",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "invoices_base",
+      "child_model": "mart_sales_funnel",
+      "fk_column": "order_id",
+      "pk_column": "order_id",
+      "join_type": "INNER"
+    }
+  ]
+}

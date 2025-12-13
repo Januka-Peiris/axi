@@ -8,9 +8,12 @@ import sqlite3
 import json
 from axi.config.settings import get_settings
 from axi.metadata.indexer import MetadataIndexer
+from axi.utils.logging_config import get_logger
+from axi.exceptions import DatabaseError, MetadataError, ValidationError
 
 router = APIRouter(prefix="/api/dimensions", tags=["dimensions"])
 settings = get_settings()
+logger = get_logger(__name__)
 
 def _get_indexer():
     return MetadataIndexer(settings.AXI_METADATA_DIR)
@@ -224,8 +227,12 @@ def list_dimensions():
                 result = [dict(row) for row in rows]
                 return result
             except sqlite3.OperationalError as e:
-                return []
+                logger.warning(f"Database error listing dimensions: {e}")
+                raise DatabaseError(f"Database error listing dimensions: {e}", code="DATABASE_ERROR")
+    except DatabaseError:
+        raise
     except Exception as e:
+        logger.error(f"Unexpected error listing dimensions: {e}")
         # Return empty list on any error to prevent 422
         return []
 
@@ -234,6 +241,11 @@ def get_dimension(dimension_id: int):
     """
     Get a single dimension by ID.
     """
+    logger.debug(f"Getting dimension: {dimension_id}")
+    # Validate dimension_id
+    if dimension_id < 1:
+        raise ValidationError("Dimension ID must be positive", code="INVALID_DIMENSION_ID")
+    
     indexer = _get_indexer()
     try:
         with indexer._get_conn() as conn:
@@ -260,19 +272,24 @@ def get_dimension(dimension_id: int):
             row = c.fetchone()
             
             if not row:
-                raise HTTPException(status_code=404, detail="Dimension not found")
+                raise HTTPException(status_code=404, detail=MetadataError(f"Dimension {dimension_id} not found", code="DIMENSION_NOT_FOUND").to_dict())
             
             return dict(row)
     except HTTPException:
         raise
+    except DatabaseError as e:
+        logger.warning(f"Database error getting dimension: {e}")
+        raise HTTPException(status_code=500, detail=e.to_dict())
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        logger.error(f"Unexpected error getting dimension: {e}")
+        raise HTTPException(status_code=500, detail=MetadataError(f"Failed to get dimension: {e}", code="DIMENSION_GET_ERROR").to_dict())
 
 @router.get("/{dimension_id}/metrics")
 def get_dimension_metrics(dimension_id: int):
     """
     Get all metrics linked to a dimension.
     """
+    logger.debug(f"Getting metrics for dimension: {dimension_id}")
     indexer = _get_indexer()
     try:
         with indexer._get_conn() as conn:
@@ -317,6 +334,7 @@ def get_dimension_entities(dimension_id: int):
     """
     Get all entities linked to a dimension.
     """
+    logger.debug(f"Getting entities for dimension: {dimension_id}")
     indexer = _get_indexer()
     try:
         with indexer._get_conn() as conn:
@@ -357,6 +375,11 @@ def get_dimension_samples(dimension_id: int, limit: int = 50):
     Get sample values for a dimension from the warehouse.
     Returns first N values (default 50).
     """
+    logger.debug(f"Getting samples for dimension: {dimension_id}, limit: {limit}")
+    # Validate limit
+    if limit < 1 or limit > 1000:
+        raise ValidationError("Limit must be between 1 and 1000", code="INVALID_LIMIT")
+    
     indexer = _get_indexer()
     try:
         with indexer._get_conn() as conn:
@@ -371,7 +394,7 @@ def get_dimension_samples(dimension_id: int, limit: int = 50):
             dim_row = c.fetchone()
             
             if not dim_row:
-                raise HTTPException(status_code=404, detail="Dimension not found")
+                raise HTTPException(status_code=404, detail=MetadataError(f"Dimension {dimension_id} not found", code="DIMENSION_NOT_FOUND").to_dict())
             
             dim_data = dict(dim_row)
             dim_name = dim_data['name']
@@ -395,20 +418,34 @@ def get_dimension_samples(dimension_id: int, limit: int = 50):
                 # Use parameterized query to prevent SQL injection
                 # Note: Table and column names need to be validated/sanitized
                 # For now, basic validation
-                if not all(c.isalnum() or c in "_." for c in source_table):
-                    raise ValueError(f"Invalid table name: {source_table}")
-                if not all(c.isalnum() or c in "_." for c in source_column):
-                    raise ValueError(f"Invalid column name: {source_column}")
+                # Sanitize table and column names
+                from axi.utils.sanitization import sanitize_identifier
+                try:
+                    safe_table = sanitize_identifier(source_table)
+                    safe_column = sanitize_identifier(source_column)
+                except ValueError as ve:
+                    raise ValidationError(str(ve), code="INVALID_IDENTIFIER")
                 
-                sql = f"SELECT DISTINCT {source_column} as value FROM {source_table} WHERE {source_column} IS NOT NULL LIMIT {limit}"
+                sql = f"SELECT DISTINCT {safe_column} as value FROM {safe_table} WHERE {safe_column} IS NOT NULL LIMIT {limit}"
                 rows, _ = runner.execute_query(sql)
+                logger.debug(f"Retrieved {len(rows)} sample values for dimension {dimension_id}")
                 return [{"value": str(row.get("value", ""))} for row in rows]
             else:
                 return []
-        except Exception:
-            # If Snowflake is not configured or query fails, return empty
+        except ValueError:
+            # If Snowflake is not configured, return empty
+            logger.debug("Snowflake not configured for dimension samples")
+            return []
+        except Exception as e:
+            logger.debug(f"Snowflake execution error for samples (non-fatal): {e}")
             return []
     except HTTPException:
         raise
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=e.to_dict())
+    except DatabaseError as e:
+        logger.warning(f"Database error getting dimension samples: {e}")
+        raise HTTPException(status_code=500, detail=e.to_dict())
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        logger.error(f"Unexpected error getting dimension samples: {e}")
+        raise HTTPException(status_code=500, detail=MetadataError(f"Failed to get dimension samples: {e}", code="DIMENSION_SAMPLES_ERROR").to_dict())

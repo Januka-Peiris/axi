@@ -1,0 +1,164 @@
+{
+  "model": "dim_colors",
+  "metrics": [],
+  "dimensions": [
+    "_fivetran_deleted",
+    "validto",
+    "colorid",
+    "lasteditedby",
+    "validfrom",
+    "_fivetran_synced",
+    "colorname"
+  ],
+  "dimension_details": [
+    {
+      "name": "_fivetran_deleted",
+      "included": true,
+      "reason": "where_filter",
+      "roles": [
+        "metric_ref",
+        "where_filter"
+      ]
+    },
+    {
+      "name": "validto",
+      "included": true,
+      "reason": "where_filter",
+      "roles": [
+        "metric_ref",
+        "where_filter"
+      ]
+    },
+    {
+      "name": "color_id",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "color_name",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "valid_from",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "valid_to",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "last_edited_by",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "last_synced_at",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "is_deleted",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "colorid",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "lasteditedby",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "validfrom",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "_fivetran_synced",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "colorname",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    }
+  ],
+  "filters": [
+    "_fivetran_deleted = FALSE AND validto > CURRENT_DATE"
+  ],
+  "source_tables": [
+    "final",
+    "stg__warehouse__colors",
+    "colors_base"
+  ],
+  "entity": {
+    "name": "dim_colors",
+    "pk": null,
+    "columns": [
+      "*",
+      "*",
+      "color_id",
+      "color_name",
+      "color_family",
+      "color_type",
+      "color_temperature",
+      "valid_from",
+      "valid_to",
+      "last_edited_by",
+      "last_synced_at",
+      "is_deleted"
+    ]
+  },
+  "relationships": [
+    {
+      "parent_model": "stg__warehouse__colors",
+      "child_model": "dim_colors",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    }
+  ]
+}

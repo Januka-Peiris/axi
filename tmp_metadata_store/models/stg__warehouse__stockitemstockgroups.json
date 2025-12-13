@@ -1,0 +1,108 @@
+{
+  "model": "stg__warehouse__stockitemstockgroups",
+  "metrics": [],
+  "dimensions": [
+    "stockitemstockgroupid",
+    "lasteditedby",
+    "stockitemid",
+    "stockgroupid",
+    "lasteditedwhen",
+    "_fivetran_deleted",
+    "_fivetran_synced"
+  ],
+  "dimension_details": [
+    {
+      "name": "stockitemstockgroupid",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "lasteditedby",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "stockitemid",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "stockgroupid",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "lasteditedwhen",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "_fivetran_deleted",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "_fivetran_synced",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    }
+  ],
+  "filters": [],
+  "source_tables": [
+    "renamed",
+    "STOCKITEMSTOCKGROUPS",
+    "source"
+  ],
+  "entity": {
+    "name": "stg__warehouse__stockitemstockgroups",
+    "pk": null,
+    "columns": [
+      "*",
+      "*",
+      "stockitemstockgroupid",
+      "lasteditedby",
+      "stockitemid",
+      "stockgroupid",
+      "lasteditedwhen",
+      "_fivetran_deleted",
+      "_fivetran_synced"
+    ]
+  },
+  "relationships": [
+    {
+      "parent_model": "STOCKITEMSTOCKGROUPS",
+      "child_model": "stg__warehouse__stockitemstockgroups",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    }
+  ]
+}

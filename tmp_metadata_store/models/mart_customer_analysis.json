@@ -1,0 +1,799 @@
+{
+  "model": "mart_customer_analysis",
+  "metrics": [
+    {
+      "name": "total_invoices",
+      "expression": "COUNT(DISTINCT i.invoice_id)",
+      "model": "mart_customer_analysis",
+      "source_table": "mart_customer_analysis",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_orders",
+      "expression": "COUNT(DISTINCT o.order_id)",
+      "model": "mart_customer_analysis",
+      "source_table": "mart_customer_analysis",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "lifetime_value",
+      "expression": "SUM(i.total_amount_including_tax)",
+      "model": "mart_customer_analysis",
+      "source_table": "mart_customer_analysis",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "lifetime_profit",
+      "expression": "SUM(i.total_profit)",
+      "model": "mart_customer_analysis",
+      "source_table": "mart_customer_analysis",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "avg_invoice_value",
+      "expression": "AVG(i.total_amount_including_tax)",
+      "model": "mart_customer_analysis",
+      "source_table": "mart_customer_analysis",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "avg",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "revenue_last_12_months",
+      "expression": "SUM(CASE WHEN i.invoice_date >= (SELECT MAX(invoice_date) FROM customer_invoices) - INTERVAL '12' MONTHS THEN i.total_amount_including_tax ELSE 0 END)",
+      "model": "mart_customer_analysis",
+      "source_table": "mart_customer_analysis",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "profit_last_12_months",
+      "expression": "SUM(CASE WHEN i.invoice_date >= (SELECT MAX(invoice_date) FROM customer_invoices) - INTERVAL '12' MONTHS THEN i.total_profit ELSE 0 END)",
+      "model": "mart_customer_analysis",
+      "source_table": "mart_customer_analysis",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "invoices_last_12_months",
+      "expression": "COUNT(CASE WHEN i.invoice_date >= (SELECT MAX(invoice_date) FROM customer_invoices) - INTERVAL '12' MONTHS THEN i.invoice_id ELSE NULL END)",
+      "model": "mart_customer_analysis",
+      "source_table": "mart_customer_analysis",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "last_invoice_date",
+      "expression": "MAX(i.invoice_date)",
+      "model": "mart_customer_analysis",
+      "source_table": "mart_customer_analysis",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "max",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "days_since_last_invoice",
+      "expression": "(SELECT MAX(invoice_date) FROM customer_invoices) - MAX(i.invoice_date)",
+      "model": "mart_customer_analysis",
+      "source_table": "mart_customer_analysis",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "max",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "frequency_score",
+      "expression": "COUNT(DISTINCT i.invoice_id)",
+      "model": "mart_customer_analysis",
+      "source_table": "mart_customer_analysis",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "monetary_score",
+      "expression": "SUM(i.total_amount_including_tax)",
+      "model": "mart_customer_analysis",
+      "source_table": "mart_customer_analysis",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "first_invoice_date",
+      "expression": "MIN(i.invoice_date)",
+      "model": "mart_customer_analysis",
+      "source_table": "mart_customer_analysis",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "min",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "customer_tenure_days",
+      "expression": "MAX(i.invoice_date) - MIN(i.invoice_date)",
+      "model": "mart_customer_analysis",
+      "source_table": "mart_customer_analysis",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "max",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "avg_quantity_per_invoice",
+      "expression": "AVG(i.total_quantity)",
+      "model": "mart_customer_analysis",
+      "source_table": "mart_customer_analysis",
+      "grain": "unknown",
+      "metric_type": "aggregate",
+      "aggregation": "avg",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "lifetime_profit_margin_percentage",
+      "expression": "CASE WHEN SUM(i.total_amount_before_tax) > 0 THEN (SUM(i.total_profit) / SUM(i.total_amount_before_tax)) * 100 ELSE 0 END",
+      "model": "mart_customer_analysis",
+      "source_table": "mart_customer_analysis",
+      "grain": "unknown",
+      "metric_type": "ratio",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "CASE WHEN SUM(i.total_amount_before_tax) > 0 THEN (SUM(i.total_profit)",
+      "denominator": "SUM(i.total_amount_before_tax)) * 100 ELSE 0 END",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "customer_name",
+      "expression": "c.customer_name /* Enrich with customer and geographic information */",
+      "model": "mart_customer_analysis",
+      "source_table": "mart_customer_analysis",
+      "grain": "unknown",
+      "metric_type": "ratio",
+      "aggregation": "custom",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "annual_customer_value",
+      "expression": "CASE WHEN cs.customer_tenure_days > 0 THEN cs.lifetime_value / (cs.customer_tenure_days / 365.0) ELSE 0 END",
+      "model": "mart_customer_analysis",
+      "source_table": "mart_customer_analysis",
+      "grain": "unknown",
+      "metric_type": "ratio",
+      "aggregation": "custom",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    }
+  ],
+  "dimensions": [
+    "order_id",
+    "customer_id",
+    "delivery_city_name",
+    "city_name",
+    "is_deleted",
+    "customer_category_name",
+    "buying_group_name",
+    "credit_limit",
+    "payment_days",
+    "is_on_credit_hold",
+    "account_opened_date",
+    "frequency_score",
+    "total_amount_including_tax",
+    "customer_tenure_days",
+    "total_quantity",
+    "state_province_name",
+    "days_since_last_invoice",
+    "invoice_date",
+    "country_name",
+    "continent",
+    "invoice_id",
+    "lifetime_value",
+    "monetary_score",
+    "customer_name",
+    "total_amount_before_tax",
+    "total_profit",
+    "*"
+  ],
+  "dimension_details": [
+    {
+      "name": "order_id",
+      "included": true,
+      "reason": "join_key",
+      "roles": [
+        "join_key",
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "customer_id",
+      "included": true,
+      "reason": "group_by",
+      "roles": [
+        "group_by",
+        "join_key",
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "delivery_city_name",
+      "included": true,
+      "reason": "join_key",
+      "roles": [
+        "join_key"
+      ]
+    },
+    {
+      "name": "city_name",
+      "included": true,
+      "reason": "join_key",
+      "roles": [
+        "join_key",
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "is_deleted",
+      "included": true,
+      "reason": "where_filter",
+      "roles": [
+        "where_filter"
+      ]
+    },
+    {
+      "name": "invoice_year",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "invoice_quarter",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "invoice_value_volatility",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "customer_category_name",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "buying_group_name",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "credit_limit",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "payment_days",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "is_on_credit_hold",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "account_opened_date",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "delivery_city",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "delivery_state_province",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "delivery_country",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "geographic_region",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "frequency_score",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "total_amount_including_tax",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "customer_tenure_days",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "total_quantity",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "state_province_name",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "days_since_last_invoice",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "invoice_date",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "country_name",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "continent",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "invoice_id",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "lifetime_value",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "monetary_score",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "customer_name",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "total_amount_before_tax",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "total_profit",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "*",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    }
+  ],
+  "filters": [
+    "i.is_deleted = FALSE"
+  ],
+  "source_tables": [
+    "final",
+    "fct_sales_invoices",
+    "fct_sales_orders",
+    "dim_customers",
+    "dim_geography",
+    "customer_invoices",
+    "customer_orders",
+    "customer_lifetime_metrics",
+    "customer_segments",
+    "customers",
+    "geography"
+  ],
+  "entity": {
+    "name": "mart_customer_analysis",
+    "pk": null,
+    "columns": [
+      "*",
+      "*",
+      "invoice_year",
+      "invoice_quarter",
+      "*",
+      "*",
+      "*",
+      "customer_id",
+      "total_invoices",
+      "total_orders",
+      "lifetime_value",
+      "lifetime_profit",
+      "avg_invoice_value",
+      "revenue_last_12_months",
+      "profit_last_12_months",
+      "invoices_last_12_months",
+      "last_invoice_date",
+      "days_since_last_invoice",
+      "frequency_score",
+      "monetary_score",
+      "first_invoice_date",
+      "customer_tenure_days",
+      "avg_quantity_per_invoice",
+      "invoice_value_volatility",
+      "lifetime_profit_margin_percentage",
+      "*",
+      "recency_score",
+      "frequency_score_quintile",
+      "monetary_score_quintile",
+      "customer_segment",
+      "*",
+      "customer_name",
+      "customer_category_name",
+      "buying_group_name",
+      "credit_limit",
+      "payment_days",
+      "is_on_credit_hold",
+      "account_opened_date",
+      "delivery_city",
+      "delivery_state_province",
+      "delivery_country",
+      "geographic_region",
+      "customer_status",
+      "value_tier",
+      "annual_customer_value"
+    ]
+  },
+  "relationships": [
+    {
+      "parent_model": "fct_sales_invoices",
+      "child_model": "mart_customer_analysis",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "fct_sales_orders",
+      "child_model": "mart_customer_analysis",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "dim_customers",
+      "child_model": "mart_customer_analysis",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "dim_geography",
+      "child_model": "mart_customer_analysis",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "customer_orders",
+      "child_model": "customer_invoices",
+      "fk_column": "order_id",
+      "pk_column": "order_id",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "customer_orders",
+      "child_model": "mart_customer_analysis",
+      "fk_column": "order_id",
+      "pk_column": "order_id",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "customers",
+      "child_model": "customer_segments",
+      "fk_column": "customer_id",
+      "pk_column": "customer_id",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "customers",
+      "child_model": "mart_customer_analysis",
+      "fk_column": "customer_id",
+      "pk_column": "customer_id",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "geography",
+      "child_model": "customers",
+      "fk_column": "delivery_city_name",
+      "pk_column": "city_name",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "geography",
+      "child_model": "mart_customer_analysis",
+      "fk_column": "delivery_city_name",
+      "pk_column": "city_name",
+      "join_type": "INNER"
+    }
+  ]
+}

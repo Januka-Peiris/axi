@@ -27,42 +27,41 @@ class ManifestLoader:
         # We also need to look at 'child_map' or 'tests' usually found in nodes?
         # dbt tests are in 'nodes' with resource_type='test'
 
-        conn = self.indexer._get_conn()
-        c = conn.cursor()
+        with self.indexer._get_conn() as conn:
+            c = conn.cursor()
 
-        # Clear existing dbt data
-        c.execute('DELETE FROM dbt_models')
-        c.execute('DELETE FROM dbt_sources')
-        c.execute('DELETE FROM dbt_tests')
+            # Clear existing dbt data
+            c.execute('DELETE FROM dbt_models')
+            c.execute('DELETE FROM dbt_sources')
+            c.execute('DELETE FROM dbt_tests')
 
-        # Parse Nodes (Models + Tests)
-        for key, node in nodes.items():
-            resource_type = node.get('resource_type')
-            
-            if resource_type == 'model':
-                self._insert_model(c, node)
-                self._upsert_entity_from_model(node)
-            elif resource_type == 'seed':
-                self._insert_seed(c, node)
-                self._upsert_entity_from_model(node, override_type="seed", read_only=True)
-            elif resource_type == 'test':
-                self._insert_test(c, node)
-            elif resource_type == 'snapshot':
-                self._insert_snapshot(c, node)
-                self._upsert_entity_from_model(node, override_type="snapshot")
+            # Parse Nodes (Models + Tests)
+            for key, node in nodes.items():
+                resource_type = node.get('resource_type')
+                
+                if resource_type == 'model':
+                    self._insert_model(c, node)
+                    self._upsert_entity_from_model(node)
+                elif resource_type == 'seed':
+                    self._insert_seed(c, node)
+                    self._upsert_entity_from_model(node, override_type="seed", read_only=True)
+                elif resource_type == 'test':
+                    self._insert_test(c, node)
+                elif resource_type == 'snapshot':
+                    self._insert_snapshot(c, node)
+                    self._upsert_entity_from_model(node, override_type="snapshot")
 
-        # Parse Sources
-        for key, source in sources.items():
-            self._insert_source(c, source)
-            self._upsert_entity_from_source(source)
+            # Parse Sources
+            for key, source in sources.items():
+                self._insert_source(c, source)
+                self._upsert_entity_from_source(source)
 
-        # Snapshots block if present
-        for key, snap in snapshots.items():
-            self._insert_snapshot(c, snap)
-            self._upsert_entity_from_model(snap, override_type="snapshot")
+            # Snapshots block if present
+            for key, snap in snapshots.items():
+                self._insert_snapshot(c, snap)
+                self._upsert_entity_from_model(snap, override_type="snapshot")
 
-        conn.commit()
-        conn.close()
+            conn.commit()
 
     def _insert_model(self, cursor, node: Dict[str, Any]):
         name = node.get('name')

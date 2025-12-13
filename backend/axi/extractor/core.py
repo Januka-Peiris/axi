@@ -6,33 +6,36 @@ import sqlglot
 from sqlglot import exp
 from typing import Dict, List, Any, Optional, Set
 import warnings
+import logging
 
 import os
 from pathlib import Path
 from axi.config.loader import Config
+from axi.utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 # Suppress sqlglot warnings about unsupported dialect features
+# Suppress noisy sqlglot warnings (e.g., ToChar format) that don't impact parsing
 warnings.filterwarnings('ignore', category=UserWarning, module='sqlglot')
+warnings.filterwarnings('ignore', message="Argument 'format' is not supported for expression 'ToChar'.*", category=UserWarning)
 
 def extract_metadata(sql: str, model_name: str, config: Optional[Config] = None) -> Dict[str, Any]:
-    debug = os.environ.get("AXI_DEBUG") == "true"
+    # Honor debug flag early to avoid UnboundLocalError when logging later
+    debug = os.environ.get("AXI_DEBUG", "").lower() == "true"
+    logger.debug(f"Extracting metadata for model: {model_name}")
     
     # 0. auto-wrap SELECT if needed (simple heuristic)
     # Some dbt files might be "select * from x" without closing semicolon, which is fine
     # But if it's "x" (table name only for snapshot?), sqlglot might fail if dialact is strict
-    
-    if debug:
-        print(f"[DEBUG] Attempting sqlglot parse... Model: {model_name}")
         
     try:
         # Try parsing with different dialects if default fails
         parsed = None
-        for dialect in [None, "snowflake", "postgres", "mysql", "sqlite"]:
+        # Try a few dialects in tolerant mode; default to Snowflake/Postgres first
+        for dialect in ["snowflake", "postgres", None, "mysql", "sqlite"]:
             try:
-                if dialect:
-                    parsed = sqlglot.parse_one(sql, dialect=dialect)
-                else:
-                    parsed = sqlglot.parse_one(sql)
+                parsed = sqlglot.parse_one(sql, read=dialect, error_level="ignore")
                 break
             except Exception:
                 continue
@@ -40,20 +43,19 @@ def extract_metadata(sql: str, model_name: str, config: Optional[Config] = None)
         if not parsed:
             raise Exception("Failed to parse with any dialect")
             
-        if debug:
-            print(f"[DEBUG] sqlglot parse SUCCESS: {model_name}")
+        logger.debug(f"Successfully parsed SQL for model: {model_name}")
             
     except Exception as e:
-         print(f"[ERROR] sqlglot failed to parse {model_name}: {e}")
+         logger.error(f"Failed to parse SQL for model {model_name}: {e}")
          
-         # Dump failing SQL
+         # Dump failing SQL for debugging
          if debug:
              debug_dir = Path("axi_debug_sql")
              debug_dir.mkdir(exist_ok=True)
              dump_path = debug_dir / f"{model_name}.sql"
              with open(dump_path, "w") as f:
                  f.write(sql)
-             print(f"[DEBUG] Saved failing SQL to {dump_path}")
+             logger.debug(f"Saved failing SQL to {dump_path}")
          
          # Re-raise to fail the extraction for this model
          raise e
@@ -85,6 +87,14 @@ def extract_metadata(sql: str, model_name: str, config: Optional[Config] = None)
     # 1. Source Tables (FROM / JOIN) and Relationships
     alias_map = {}
     model_refs = []  # Track model references (from ref(), source(), etc.)
+    cte_aliases: Set[str] = set()
+
+    # Track CTE aliases to avoid emitting relationships against internal CTE names
+    if isinstance(parsed, exp.Select) and parsed.ctes:
+        for cte in parsed.ctes:
+            alias = getattr(cte, "alias", None) or getattr(cte, "alias_or_name", None)
+            if alias and isinstance(alias, str):
+                cte_aliases.add(alias)
     
     # Identifies all source tables and aliases
     
@@ -119,6 +129,9 @@ def extract_metadata(sql: str, model_name: str, config: Optional[Config] = None)
                         cte_tables.append(tbl.name)
                 # Create relationships: CTE references these tables
                 for ref_table in cte_tables:
+                    if ref_table in cte_aliases:
+                        # Skip internal CTE names; we only want actual tables/views
+                        continue
                     if ref_table != model_name and ref_table not in [r.get('child_model') for r in relationships]:
                         relationships.append({
                             "parent_model": ref_table,
@@ -198,13 +211,28 @@ def extract_metadata(sql: str, model_name: str, config: Optional[Config] = None)
                                    _add_role(fk_col, "join_key", "join_key")
                                if pk_col:
                                    _add_role(pk_col, "join_key", "join_key")
-    
+                               # Also relate the joined table to the current model so downstream joins
+                               # have keys even if compiled SQL is missing for some models.
+                               model_edge_exists = any(
+                                   r.get("parent_model") == parent_model and 
+                                   r.get("child_model") == model_name
+                                   for r in relationships
+                               )
+                               if not model_edge_exists and fk_col and pk_col:
+                                   relationships.append({
+                                      "parent_model": parent_model,
+                                      "child_model": model_name,
+                                      "fk_column": fk_col,
+                                      "pk_column": pk_col,
+                                      "join_type": join.kind if join.kind else "INNER" 
+                                   })
+
     # Extract relationships from FROM clauses (model dependencies)
     # If a model references another model in FROM, create a dependency relationship
     for from_clause in parsed.find_all(exp.From):
         if isinstance(from_clause.this, exp.Table):
             ref_table = from_clause.this.name
-            if ref_table and ref_table != model_name and ref_table not in ["unknown", ""]:
+            if ref_table and ref_table not in cte_aliases and ref_table != model_name and ref_table not in ["unknown", ""]:
                 # Check if relationship already exists
                 existing = any(
                     r.get("parent_model") == ref_table and 
@@ -614,7 +642,7 @@ def extract_metadata(sql: str, model_name: str, config: Optional[Config] = None)
 
         if debug:
             log_reason = reason
-            print(f"[DIM] {'Kept' if included else 'Pruned'}: {dim_name} (reason: {log_reason})")
+            logger.debug(f"Dimension {'kept' if included else 'pruned'}: {dim_name} (reason: {log_reason})")
 
     return {
         "model": model_name,

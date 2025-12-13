@@ -1,6 +1,8 @@
 import os
 import shutil
+import tempfile
 import unittest
+from pathlib import Path
 from axi.extractor.scanner import SqlScanner
 from axi.extractor.promotion import PromotionResult
 
@@ -11,8 +13,7 @@ class MockPromotionEngine:
 
 class TestScanner(unittest.TestCase):
     def setUp(self):
-        self.test_dir = "test_dbt_project"
-        os.makedirs(self.test_dir, exist_ok=True)
+        self.test_dir = tempfile.mkdtemp(prefix="test_dbt_project_")
         # Mock dbt_project.yml
         with open(os.path.join(self.test_dir, "dbt_project.yml"), "w") as f:
             f.write("name: test_project\n")
@@ -27,9 +28,11 @@ class TestScanner(unittest.TestCase):
         os.makedirs(compiled_dir, exist_ok=True)
         with open(os.path.join(compiled_dir, "raw_model.sql"), "w") as f:
             f.write("SELECT * FROM db.schema.other")
-
+    
     def tearDown(self):
-        shutil.rmtree(self.test_dir)
+        """Clean up test fixtures."""
+        if os.path.exists(self.test_dir):
+            shutil.rmtree(self.test_dir, ignore_errors=True)
 
     def test_compiled_priority(self):
         scanner = SqlScanner(self.test_dir, MockPromotionEngine())

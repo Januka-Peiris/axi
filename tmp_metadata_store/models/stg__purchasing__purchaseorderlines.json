@@ -1,0 +1,185 @@
+{
+  "model": "stg__purchasing__purchaseorderlines",
+  "metrics": [],
+  "dimensions": [
+    "purchaseorderlineid",
+    "lastreceiptdate",
+    "lasteditedby",
+    "description",
+    "receivedouters",
+    "stockitemid",
+    "purchaseorderid",
+    "orderedouters",
+    "isorderlinefinalized",
+    "packagetypeid",
+    "lasteditedwhen",
+    "expectedunitpriceperouter",
+    "_fivetran_deleted",
+    "_fivetran_synced"
+  ],
+  "dimension_details": [
+    {
+      "name": "purchaseorderlineid",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "lastreceiptdate",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "lasteditedby",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "description",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "receivedouters",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "stockitemid",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "purchaseorderid",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "orderedouters",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "isorderlinefinalized",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "packagetypeid",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "lasteditedwhen",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "expectedunitpriceperouter",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "_fivetran_deleted",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "_fivetran_synced",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    }
+  ],
+  "filters": [],
+  "source_tables": [
+    "renamed",
+    "PURCHASEORDERLINES",
+    "source"
+  ],
+  "entity": {
+    "name": "stg__purchasing__purchaseorderlines",
+    "pk": null,
+    "columns": [
+      "*",
+      "*",
+      "purchaseorderlineid",
+      "lastreceiptdate",
+      "lasteditedby",
+      "description",
+      "receivedouters",
+      "stockitemid",
+      "purchaseorderid",
+      "orderedouters",
+      "isorderlinefinalized",
+      "packagetypeid",
+      "lasteditedwhen",
+      "expectedunitpriceperouter",
+      "_fivetran_deleted",
+      "_fivetran_synced"
+    ]
+  },
+  "relationships": [
+    {
+      "parent_model": "PURCHASEORDERLINES",
+      "child_model": "stg__purchasing__purchaseorderlines",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    }
+  ]
+}

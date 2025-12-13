@@ -12,6 +12,7 @@ dependencies = [
   "uvicorn",
   "pydantic",
   "pydantic-settings",
+  "python-dotenv",
   "click",
   "sqlalchemy",
   "alembic",
@@ -19,7 +20,8 @@ dependencies = [
   "rich",
   "snowflake-connector-python",
   "pyyaml",
-  "typer"
+  "typer",
+  "psycopg2-binary"
 ]
 
 [project.scripts]

@@ -1,0 +1,335 @@
+{
+  "model": "fct_temperature_monitoring",
+  "metrics": [
+    {
+      "name": "temperature_id",
+      "expression": "temperature_id /* Identifiers */",
+      "model": "fct_temperature_monitoring",
+      "source_table": "fct_temperature_monitoring",
+      "grain": "unknown",
+      "metric_type": "ratio",
+      "aggregation": "custom",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "temperature",
+      "expression": "temperature /* Temperature data */",
+      "model": "fct_temperature_monitoring",
+      "source_table": "fct_temperature_monitoring",
+      "grain": "unknown",
+      "metric_type": "ratio",
+      "aggregation": "custom",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    }
+  ],
+  "dimensions": [
+    "_fivetran_deleted",
+    "sensor_number",
+    "vehicle_registration",
+    "recordedwhen",
+    "validfrom",
+    "validto",
+    "_fivetran_synced",
+    "vehicleregistration",
+    "sensor_type",
+    "vehicletemperatureid",
+    "chillersensornumber",
+    "coldroomsensornumber",
+    "temperature_id",
+    "temperature",
+    "coldroomtemperatureid"
+  ],
+  "dimension_details": [
+    {
+      "name": "_fivetran_deleted",
+      "included": true,
+      "reason": "where_filter",
+      "roles": [
+        "metric_ref",
+        "select_only",
+        "where_filter"
+      ]
+    },
+    {
+      "name": "sensor_number",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "vehicle_registration",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "recordedwhen",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "validfrom",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "validto",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "_fivetran_synced",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "vehicleregistration",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "sensor_type",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref",
+        "select_only"
+      ]
+    },
+    {
+      "name": "recorded_when",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "recorded_hour",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "recorded_date",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "hour_of_day",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "day_of_week",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "valid_from",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "valid_to",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "last_synced_at",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "is_deleted",
+      "included": false,
+      "reason": "pruned",
+      "roles": [
+        "select_only"
+      ]
+    },
+    {
+      "name": "vehicletemperatureid",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "chillersensornumber",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "coldroomsensornumber",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "temperature_id",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "temperature",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    },
+    {
+      "name": "coldroomtemperatureid",
+      "included": true,
+      "reason": "metric_ref",
+      "roles": [
+        "metric_ref"
+      ]
+    }
+  ],
+  "filters": [
+    "_fivetran_deleted = FALSE"
+  ],
+  "source_tables": [
+    "final",
+    "stg__warehouse__coldroomtemperatures",
+    "stg__warehouse__vehicletemperatures",
+    "combined_temperatures",
+    "coldroom_temps",
+    "vehicle_temps"
+  ],
+  "entity": {
+    "name": "fct_temperature_monitoring",
+    "pk": null,
+    "columns": [
+      "*",
+      "temperature_id",
+      "sensor_type",
+      "sensor_number",
+      "vehicle_registration",
+      "temperature",
+      "recordedwhen",
+      "validfrom",
+      "validto",
+      "_fivetran_deleted",
+      "_fivetran_synced",
+      "temperature_id",
+      "sensor_type",
+      "sensor_number",
+      "vehicleregistration",
+      "temperature",
+      "recordedwhen",
+      "validfrom",
+      "validto",
+      "_fivetran_deleted",
+      "_fivetran_synced",
+      "monitoring_record_id",
+      "temperature_id",
+      "sensor_type",
+      "sensor_number",
+      "vehicle_registration",
+      "temperature",
+      "recorded_when",
+      "temperature_alert_level",
+      "is_temperature_critical",
+      "recorded_hour",
+      "recorded_date",
+      "hour_of_day",
+      "day_of_week",
+      "valid_from",
+      "valid_to",
+      "last_synced_at",
+      "is_deleted"
+    ]
+  },
+  "relationships": [
+    {
+      "parent_model": "stg__warehouse__coldroomtemperatures",
+      "child_model": "fct_temperature_monitoring",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "stg__warehouse__vehicletemperatures",
+      "child_model": "fct_temperature_monitoring",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    }
+  ]
+}

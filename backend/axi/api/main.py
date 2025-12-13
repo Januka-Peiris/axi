@@ -4,9 +4,13 @@
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import Dict, Any, List, Optional
+from pydantic import BaseModel, Field, field_validator
+from typing import Dict, Any, List, Optional, Union
 import os, glob, json
+import logging
+import sqlite3
+import snowflake.connector
+import yaml
 
 from axi.config.loader import load_config
 from axi.extractor.promotion import PromotionEngine
@@ -18,8 +22,35 @@ from axi.query.graph import SemanticGraph
 from axi.query.engine import SemanticQueryEngine
 from axi.execution.snowflake_runner import SnowflakeRunner
 from axi.config.settings import get_settings
+from axi.utils.logging_config import setup_logging, get_logger
+from axi.utils.sanitization import (
+    validate_metric_name,
+    validate_dimension_name,
+    sanitize_string,
+    sanitize_path
+)
+from axi.exceptions import (
+    AXIBaseException,
+    ValidationError,
+    MetadataError,
+    QueryError,
+    DatabaseError,
+    ConfigurationError
+)
+
+# Load .env files before initializing settings
+from axi.config.env_loader import load_env_file
+load_env_file()
 
 settings = get_settings()
+
+# Initialize logging on module import
+setup_logging(
+    log_level=settings.log_level,
+    log_file=settings.log_file,
+    json_format=settings.log_json
+)
+logger = get_logger(__name__)
 
 app = FastAPI(title="AXI Semantic Layer")
 
@@ -59,16 +90,36 @@ for router in API_ROUTERS_REGISTRY:
     app.include_router(router)
 
 class QueryRequest(BaseModel):
-    metric: str
-    dimensions: List[str]
-    filters: List[str] = []
+    metric: str = Field(..., min_length=1, description="Metric name")
+    dimensions: List[str] = Field(default_factory=list, description="List of dimension names")
+    filters: List[Union[str, Dict[str, Any]]] = Field(default_factory=list, description="List of filter strings or objects")
+    
+    @field_validator('metric')
+    @classmethod
+    def validate_metric(cls, v: str) -> str:
+        return validate_metric_name(v)
+    
+    @field_validator('dimensions')
+    @classmethod
+    def validate_dimensions(cls, v: List[str]) -> List[str]:
+        validated = []
+        for dim in v:
+            if not dim or not dim.strip():
+                continue
+            validated.append(validate_dimension_name(dim))
+        return validated
 
 class RunRequest(BaseModel):
     sql: str
     limit: int = 500
 
 class ExtractRequest(BaseModel):
-    path: str
+    path: str = Field(..., min_length=1, description="Path to directory containing SQL files")
+    
+    @field_validator('path')
+    @classmethod
+    def validate_path(cls, v: str) -> str:
+        return sanitize_path(v)
 
 @app.get("/health")
 def health():
@@ -76,36 +127,47 @@ def health():
     try:
         runner = SnowflakeRunner()
         snowflake_ok = runner.test_connection()
-    except Exception:
+    except ValueError as ve:
+        # Missing credentials - not an error, just unavailable
+        logger.debug(f"Snowflake unavailable: {ve}")
         snowflake_ok = False
+    except (snowflake.connector.errors.DatabaseError, snowflake.connector.errors.OperationalError) as e:
+        # Connection/auth errors
+        logger.debug(f"Snowflake connection error: {e}")
+        snowflake_ok = False
+    except Exception as e:
+        # Unexpected errors
+        logger.warning(f"Unexpected error checking Snowflake health: {e}")
+        snowflake_ok = False
+        # Don't raise - health check should be resilient
     return {"status": "ok", "snowflake": snowflake_ok}
 
 @app.post("/extract")
 def extract_metadata_endpoint(req: ExtractRequest):
     base_path = os.path.abspath(req.path)
     if not os.path.exists(base_path):
-        raise HTTPException(status_code=404, detail="Path not found")
+        raise HTTPException(status_code=404, detail={"code": "PATH_NOT_FOUND", "message": f"Path not found: {base_path}"})
+    if not os.path.isdir(base_path):
+        raise HTTPException(status_code=400, detail={"code": "INVALID_PATH", "message": f"Path is not a directory: {base_path}"})
         
-    # Load config (assuming axi.yml in base_path or current dir?)
-    # For now, let's look for axi.yml in base_path
+    # Load config (supports environment-specific files)
     config_path = os.path.join(base_path, "axi.yml")
-    config = load_config(config_path)
+    try:
+        config = load_config(config_path=config_path, env=settings.env)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail={"code": "CONFIG_NOT_FOUND", "message": f"axi.yml not found at {config_path}"})
+    except (yaml.YAMLError, ValueError) as e:
+        raise HTTPException(status_code=400, detail={"code": "INVALID_CONFIG", "message": f"Invalid config file: {str(e)}"})
+    except ConfigurationError as e:
+        raise HTTPException(status_code=400, detail=e.to_dict())
+    except Exception as e:
+        logger.error(f"Unexpected error loading config: {e}")
+        raise HTTPException(status_code=500, detail=ConfigurationError("Failed to load configuration", code="CONFIG_LOAD_ERROR").to_dict())
     
     promotion_engine = PromotionEngine(config)
     scanner = SqlScanner(base_path, promotion_engine)
     
-    # Metadata output dir
-    # Stored under axi/metadata/models/ ? 
-    # Or relative to where app is running? 
-    # "axi/metadata/models/<model_name>.json"
-    # Let's use a fixed location for now or relative to project root
-    # assuming we run from 'backend' or root.
-    # Let's put it in /tmp/axi/metadata or similar for now if not specified?
-    # Or strict path: /home/jay/msh/axi/backend/axi/metadata/models works if we are there.
-    # But this is a library.
-    # Let's save to `output_dir` in `req` or default to `./metadata_store`.
-    
-    metadata_dir = settings.AXI_METADATA_DIR
+    metadata_dir = settings.metadata_dir
     writer = MetadataWriter(metadata_dir)
     
     extracted_count = 0
@@ -118,8 +180,15 @@ def extract_metadata_endpoint(req: ExtractRequest):
             meta = extract_metadata(model.content, model_name)
             writer.write(meta)
             extracted_count += 1
+        except (ValueError, KeyError) as e:
+            errors.append(f"Error extracting {model.path}: {str(e)}")
+            logger.warning(f"Extraction error for {model.path}: {e}")
+        except MetadataError as e:
+            errors.append(f"Error extracting {model.path}: {str(e)}")
+            logger.warning(f"Metadata error extracting {model.path}: {e}")
         except Exception as e:
             errors.append(f"Error extracting {model.path}: {str(e)}")
+            logger.error(f"Unexpected extraction error for {model.path}: {e}")
             
     return {
         "status": "success", 
@@ -135,34 +204,81 @@ def list_metrics():
 
 @app.get("/metrics/{metric_name}")
 def get_metric(metric_name: str):
+    # Validate metric name
+    try:
+        metric_name = validate_metric_name(metric_name)
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=ValidationError(str(ve), code="INVALID_METRIC_NAME").to_dict())
+    
     indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
     m = indexer.get_metric(metric_name)
     if not m:
-         raise HTTPException(status_code=404, detail="Metric not found")
+         raise HTTPException(status_code=404, detail=MetadataError("Metric not found", code="METRIC_NOT_FOUND").to_dict())
     return m
 
 @app.get("/metrics/{metric_name}/sql")
 def get_metric_sql(metric_name: str, dims: str = "", filters: str = "", compare: str = None, window: str = None):
+    # Validate metric name
+    try:
+        metric_name = validate_metric_name(metric_name)
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=ValidationError(str(ve), code="INVALID_METRIC_NAME").to_dict())
+    
+    # Sanitize dimensions and filters
+    dim_list = []
+    if dims:
+        for d in dims.split(","):
+            d = d.strip()
+            if d:
+                try:
+                    dim_list.append(validate_dimension_name(d))
+                except ValueError:
+                    # Skip invalid dimensions
+                    logger.warning(f"Invalid dimension name: {d}")
+    
+    filter_list = []
+    if filters:
+        for f in filters.split(","):
+            f = f.strip()
+            if f:
+                filter_list.append(sanitize_string(f, max_length=500))
+    
     indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
     engine = SemanticQueryEngine(indexer)
-    dim_list = [d.strip() for d in dims.split(",")] if dims else []
-    filter_list = [f.strip() for f in filters.split(",")] if filters else []
     try:
         sql = engine.generate_sql(metric_name, dim_list, filter_list, dialect="ansi", compare=compare, window=window)
         return {"sql": sql}
+    except QueryError as se:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": se.code, "message": str(se), "hint": se.hint}
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail={"code": "VALIDATION_ERROR", "message": str(ve)})
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"Unexpected error generating SQL: {e}")
+        raise HTTPException(status_code=500, detail={"code": "SQL_GENERATION_ERROR", "message": "Failed to generate SQL"})
 
 @app.get("/metrics/{metric_name}/dependencies")
 def get_metric_deps(metric_name: str):
+    # Validate metric name
+    try:
+        metric_name = validate_metric_name(metric_name)
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=ValidationError(str(ve), code="INVALID_METRIC_NAME").to_dict())
+    
     indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
     m = indexer.get_metric(metric_name)
     if not m:
-         raise HTTPException(status_code=404, detail="Metric not found")
+         raise HTTPException(status_code=404, detail=MetadataError("Metric not found", code="METRIC_NOT_FOUND").to_dict())
     return {"dependencies": m.get('depends_on', [])}
 
 @app.get("/metrics/search")
 def search_metrics(tag: str = None):
+    # Sanitize tag if provided
+    if tag:
+        tag = sanitize_string(tag, max_length=100)
+    
     indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
     res = []
     for m in indexer.list_metrics():
@@ -180,8 +296,19 @@ def list_models():
         indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
         models = indexer.list_models()
         return models if models else []
+    except DatabaseError as e:
+        raise HTTPException(status_code=500, detail=e.to_dict())
+    except sqlite3.OperationalError as e:
+        logger.warning(f"Database error listing models: {e}")
+        return []
+    except DatabaseError as e:
+        logger.warning(f"Database error listing models: {e}")
+        return []
+    except MetadataError as e:
+        logger.warning(f"Metadata error listing models: {e}")
+        return []
     except Exception as e:
-        # Return empty list on error to prevent 500
+        logger.error(f"Unexpected error listing models: {e}")
         return []
 
 # Old /dimensions route removed - use /api/dimensions router instead
@@ -199,8 +326,19 @@ def list_entities():
         indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
         entities = indexer.list_entities()
         return entities if entities else []
+    except DatabaseError as e:
+        raise HTTPException(status_code=500, detail=e.to_dict())
+    except sqlite3.OperationalError as e:
+        logger.warning(f"Database error listing entities: {e}")
+        return []
+    except DatabaseError as e:
+        logger.warning(f"Database error listing entities: {e}")
+        return []
+    except MetadataError as e:
+        logger.warning(f"Metadata error listing entities: {e}")
+        return []
     except Exception as e:
-        # Return empty list on error to prevent 500
+        logger.error(f"Unexpected error listing entities: {e}")
         return []
 
 @app.get("/api/entities/{name}")
@@ -208,10 +346,13 @@ def get_entity_detail(name: str, include_pruned: bool = False):
     """
     Return entity with dimensions including pruning metadata, plus metrics referencing it and relationships.
     """
+    # Sanitize entity name
+    name = sanitize_string(name, max_length=255)
+    
     indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
     ent = indexer.get_entity(name)
     if not ent:
-        raise HTTPException(status_code=404, detail="Entity not found")
+        raise HTTPException(status_code=404, detail=MetadataError("Entity not found", code="ENTITY_NOT_FOUND").to_dict())
 
     model_name = ent.get("model") or name
     dim_details = []
@@ -221,7 +362,19 @@ def get_entity_detail(name: str, include_pruned: bool = False):
             with open(model_path, "r") as f:
                 model_json = json.load(f)
                 dim_details = model_json.get("dimension_details", [])
-    except Exception:
+    except FileNotFoundError:
+        dim_details = []
+    except json.JSONDecodeError as e:
+        logger.warning(f"Invalid JSON in model file {model_path}: {e}")
+        dim_details = []
+    except (FileNotFoundError, json.JSONDecodeError):
+        # Already handled above
+        dim_details = []
+    except MetadataError as e:
+        logger.warning(f"Metadata error reading model file {model_path}: {e}")
+        dim_details = []
+    except Exception as e:
+        logger.warning(f"Unexpected error reading model file {model_path}: {e}")
         dim_details = []
 
     if not include_pruned:
@@ -234,7 +387,19 @@ def get_entity_detail(name: str, include_pruned: bool = False):
         for m in all_metrics:
             if m.get("entity_name") == name or m.get("model") == name:
                 metrics.append(m.get("name") or m.get("metric"))
-    except Exception:
+    except DatabaseError as e:
+        raise HTTPException(status_code=500, detail=e.to_dict())
+    except sqlite3.OperationalError as e:
+        logger.warning(f"Database error listing metrics for entity: {e}")
+        metrics = []
+    except DatabaseError as e:
+        logger.warning(f"Database error listing metrics for entity: {e}")
+        metrics = []
+    except MetadataError as e:
+        logger.warning(f"Metadata error listing metrics for entity: {e}")
+        metrics = []
+    except Exception as e:
+        logger.warning(f"Unexpected error listing metrics for entity: {e}")
         metrics = []
 
     # Relationships
@@ -311,9 +476,20 @@ def graph():
             }
         
         return graph_data
+    except DatabaseError as e:
+        raise HTTPException(status_code=500, detail=e.to_dict())
+    except sqlite3.OperationalError as e:
+        logger.warning(f"Database error building graph: {e}")
+        return {"nodes": [], "edges": [], "error": "Database error"}
+    except DatabaseError as e:
+        logger.warning(f"Database error building graph: {e}")
+        return {"nodes": [], "edges": [], "error": "Database error"}
+    except MetadataError as e:
+        logger.warning(f"Metadata error building graph: {e}")
+        return {"nodes": [], "edges": [], "error": "Metadata error"}
     except Exception as e:
-        # Return empty graph on error
-        return {"nodes": [], "edges": []}
+        logger.error(f"Unexpected error building graph: {e}")
+        return {"nodes": [], "edges": [], "error": "Failed to build graph"}
 
 def _graph_nodes_edges(indexer, include_dimensions: bool = True):
     nodes = []
@@ -327,7 +503,14 @@ def _graph_nodes_edges(indexer, include_dimensions: bool = True):
             name = pr.get("name")
             if name:
                 promotion_map[name] = pr.get("status")
-    except Exception:
+    except (sqlite3.OperationalError, AttributeError) as e:
+        logger.debug(f"Error loading promotion results: {e}")
+        promotion_map = {}
+    except (DatabaseError, MetadataError) as e:
+        logger.debug(f"Error loading promotion results: {e}")
+        promotion_map = {}
+    except Exception as e:
+        logger.warning(f"Unexpected error loading promotion results: {e}")
         promotion_map = {}
 
     # Entity nodes
@@ -411,33 +594,7 @@ def _local_subgraph(node_id: str, depth: int, indexer):
                 q.append((nbr, d + 1))
     return {"nodes": list(sub_nodes.values()), "edges": sub_edges}
 
-@app.get("/api/graph/local")
-def graph_local_param(node: str, depth: int = 1):
-    """
-    Local subgraph for a node (entity/metric/dimension). Depth 1 or 2.
-    """
-    depth = 1 if depth < 1 else 2 if depth > 2 else depth
-    indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
-    return _local_subgraph(node, depth, indexer)
-
-@app.get("/api/graph/filtered")
-def graph_filtered(root: str, depth: int = 2, types: str = "entity,metric,dimension", promoted_only: bool = False):
-    """
-    Filtered graph walk from root with depth 1..3 and type filter.
-    Caps at 300 nodes.
-    """
-    depth = max(1, min(depth, 3))
-    indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
-    base = _local_subgraph(root, depth, indexer)
-    if base.get("error"):
-        return base
-    type_set = set([t.strip() for t in types.split(",") if t.strip()])
-    filtered_nodes = [n for n in base["nodes"] if not type_set or n.get("type") in type_set]
-    node_ids = set(n["id"] for n in filtered_nodes)
-    filtered_edges = [e for e in base["edges"] if e["from"] in node_ids and e["to"] in node_ids]
-    if len(filtered_nodes) > 300:
-        return {"error": {"code": "GRAPH_TOO_LARGE", "message": "Filtered graph exceeds 300 nodes. Narrow your filters."}}
-    return {"nodes": filtered_nodes, "edges": filtered_edges}
+# Removed duplicate endpoints - using SemanticGraph-based implementations below
 
 @app.get("/api/graph/categories")
 def graph_categories():
@@ -489,15 +646,29 @@ def graph_local(node: str, depth: int = 1):
     - node: Node ID/name (required)
     - depth: 1 or 2 (default: 1)
     """
+    if not node or not node.strip():
+        raise HTTPException(status_code=400, detail={"code": "INVALID_NODE", "message": "Node parameter is required"})
+    
+    if depth < 1 or depth > 2:
+        depth = 1
+    
     try:
-        if depth < 1 or depth > 2:
-            depth = 1
-        
         indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
         sg = SemanticGraph(indexer)
         return sg.get_local_subgraph(node, depth)
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail={"code": "INVALID_NODE", "message": str(ve)})
+    except DatabaseError as e:
+        raise HTTPException(status_code=500, detail=e.to_dict())
+    except sqlite3.OperationalError as e:
+        logger.warning(f"Database error getting local graph: {e}")
+        raise HTTPException(status_code=500, detail={"code": "DATABASE_ERROR", "message": "Database error"})
+    except DatabaseError as e:
+        logger.warning(f"Database error getting local graph: {e}")
+        raise HTTPException(status_code=500, detail=e.to_dict())
     except Exception as e:
-        return {"nodes": [], "edges": [], "error": str(e)}
+        logger.error(f"Unexpected error getting local graph: {e}")
+        raise HTTPException(status_code=500, detail=MetadataError("Failed to get local graph", code="GRAPH_ERROR").to_dict())
 
 @app.get("/api/graph/filtered")
 def graph_filtered(root: Optional[str] = None, depth: int = 2, types: Optional[str] = None):
@@ -508,19 +679,35 @@ def graph_filtered(root: Optional[str] = None, depth: int = 2, types: Optional[s
     - depth: 1, 2, or 3 (default: 2)
     - types: Comma-separated list of node types (optional)
     """
+    # Validate depth
+    if depth < 1 or depth > 3:
+        depth = 2
+    
+    # Sanitize root and types
+    if root:
+        root = sanitize_string(root, max_length=255)
+    
+    node_types = None
+    if types:
+        node_types = [sanitize_string(t.strip(), max_length=50) for t in types.split(",") if t.strip()]
+    
     try:
-        if depth < 1 or depth > 3:
-            depth = 2
-        
-        node_types = None
-        if types:
-            node_types = [t.strip() for t in types.split(",")]
-        
         indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
         sg = SemanticGraph(indexer)
         return sg.get_filtered_graph(root_node=root, depth=depth, node_types=node_types)
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail={"code": "INVALID_FILTER", "message": str(ve)})
+    except DatabaseError as e:
+        raise HTTPException(status_code=500, detail=e.to_dict())
+    except sqlite3.OperationalError as e:
+        logger.warning(f"Database error getting filtered graph: {e}")
+        raise HTTPException(status_code=500, detail={"code": "DATABASE_ERROR", "message": "Database error"})
+    except DatabaseError as e:
+        logger.warning(f"Database error getting filtered graph: {e}")
+        raise HTTPException(status_code=500, detail=e.to_dict())
     except Exception as e:
-        return {"nodes": [], "edges": [], "error": str(e)}
+        logger.error(f"Unexpected error getting filtered graph: {e}")
+        raise HTTPException(status_code=500, detail=MetadataError("Failed to get filtered graph", code="GRAPH_ERROR").to_dict())
 
 @app.get("/api/graph/category")
 def graph_category(type: Optional[str] = None):
@@ -529,12 +716,25 @@ def graph_category(type: Optional[str] = None):
     Query params:
     - type: Category type to filter (optional: entities, metrics, dimensions, models)
     """
+    # Sanitize type if provided
+    if type:
+        type = sanitize_string(type, max_length=50)
+    
     try:
         indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
         sg = SemanticGraph(indexer)
         return sg.get_category_graph(category_type=type)
+    except DatabaseError as e:
+        raise HTTPException(status_code=500, detail=e.to_dict())
+    except sqlite3.OperationalError as e:
+        logger.warning(f"Database error getting category graph: {e}")
+        raise HTTPException(status_code=500, detail={"code": "DATABASE_ERROR", "message": "Database error"})
+    except DatabaseError as e:
+        logger.warning(f"Database error getting category graph: {e}")
+        raise HTTPException(status_code=500, detail=e.to_dict())
     except Exception as e:
-        return {"nodes": [], "edges": [], "error": str(e)}
+        logger.error(f"Unexpected error getting category graph: {e}")
+        raise HTTPException(status_code=500, detail=MetadataError("Failed to get category graph", code="GRAPH_ERROR").to_dict())
 
 @app.post("/semantic/sql")
 def generate_sql(req: QueryRequest):
@@ -544,8 +744,16 @@ def generate_sql(req: QueryRequest):
         # Pydantic model doesn't have optimize field yet, assuming default True
         sql = engine.generate_sql(req.metric, req.dimensions, req.filters, optimize=True)
         return {"sql": sql}
+    except QueryError as se:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": se.code, "message": str(se), "hint": se.hint}
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail={"code": "VALIDATION_ERROR", "message": str(ve)})
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"Unexpected error generating SQL: {e}")
+        raise HTTPException(status_code=500, detail={"code": "SQL_GENERATION_ERROR", "message": "Failed to generate SQL"})
 
 @app.post("/semantic/explain")
 def explain_sql(req: QueryRequest):
@@ -564,8 +772,19 @@ def explain_sql(req: QueryRequest):
                 opt.add_rule(rule)
         
         return opt.explain(raw_sql)
+    except QueryError as se:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": se.code, "message": str(se), "hint": se.hint}
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail={"code": "VALIDATION_ERROR", "message": str(ve)})
+    except QueryError as e:
+        logger.warning(f"Query error explaining SQL: {e}")
+        raise HTTPException(status_code=400, detail=e.to_dict())
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"Unexpected error explaining SQL: {e}")
+        raise HTTPException(status_code=500, detail=QueryError("Failed to explain SQL", code="EXPLAIN_ERROR").to_dict())
 
 @app.post("/snowflake/sync")
 def snowflake_sync():
@@ -578,8 +797,16 @@ def snowflake_sync():
     try:
         extractor.sync()
         return {"status": "success"}
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail={"code": "MISSING_CREDENTIALS", "message": str(ve)})
+    except (snowflake.connector.errors.DatabaseError, snowflake.connector.errors.OperationalError) as e:
+        raise HTTPException(status_code=401, detail={"code": "SNOWFLAKE_CONNECTION_ERROR", "message": str(e)})
+    except DatabaseError as e:
+        logger.warning(f"Database error syncing Snowflake: {e}")
+        raise HTTPException(status_code=500, detail=e.to_dict())
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"Unexpected error syncing Snowflake: {e}")
+        raise HTTPException(status_code=500, detail=MetadataError("Failed to sync Snowflake metadata", code="SYNC_ERROR").to_dict())
 
 @app.get("/snowflake/tables")
 def sf_tables():
@@ -588,6 +815,13 @@ def sf_tables():
 
 @app.get("/snowflake/columns")
 def sf_columns(table: str):
+    # Sanitize table name
+    from axi.utils.sanitization import sanitize_identifier
+    try:
+        table = sanitize_identifier(table)
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=ValidationError(str(ve), code="INVALID_TABLE_NAME").to_dict())
+    
     indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
     return indexer.list_sf_columns(table)
 
@@ -598,6 +832,14 @@ def sf_policies():
 
 @app.get("/snowflake/lineage")
 def sf_lineage(table: Optional[str] = None):
+    # Sanitize table name if provided
+    if table:
+        from axi.utils.sanitization import sanitize_identifier
+        try:
+            table = sanitize_identifier(table)
+        except ValueError as ve:
+            raise HTTPException(status_code=400, detail=ValidationError(str(ve), code="INVALID_TABLE_NAME").to_dict())
+    
     indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
     return indexer.list_sf_lineage(table)
 
@@ -611,8 +853,19 @@ def sf_explain(req: QueryRequest):
     try:
         sql = engine.generate_sql(req.metric, req.dimensions, req.filters, dialect="snowflake")
         return {"sql": sql}
+    except QueryError as se:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": se.code, "message": str(se), "hint": se.hint}
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail={"code": "VALIDATION_ERROR", "message": str(ve)})
+    except QueryError as e:
+        logger.warning(f"Query error generating Snowflake SQL: {e}")
+        raise HTTPException(status_code=400, detail=e.to_dict())
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"Unexpected error generating Snowflake SQL: {e}")
+        raise HTTPException(status_code=500, detail=QueryError("Failed to generate SQL", code="SQL_GENERATION_ERROR").to_dict())
 
 @app.get("/dbt/models")
 def dbt_models():
@@ -621,10 +874,13 @@ def dbt_models():
 
 @app.get("/dbt/models/{name}")
 def dbt_model(name: str):
+    # Sanitize model name
+    name = sanitize_string(name, max_length=255)
+    
     indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
     m = indexer.get_dbt_model(name)
     if not m:
-        raise HTTPException(status_code=404, detail="dbt model not found")
+        raise HTTPException(status_code=404, detail=MetadataError("dbt model not found", code="DBT_MODEL_NOT_FOUND").to_dict())
     return m
 
 @app.get("/dbt/sources")
@@ -639,6 +895,10 @@ def dbt_tests():
 
 @app.get("/dbt/constraints")
 def dbt_constraints(model: str = None):
+    # Sanitize model name if provided
+    if model:
+        model = sanitize_string(model, max_length=255)
+    
     indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
     return indexer.list_constraints(model)
 
@@ -661,13 +921,35 @@ def load_manifest(req: ManifestRequest):
         loader.load_manifest(req.path)
         bridge.map_constraints()
         return {"status": "success", "message": "Manifest loaded and constraints mapped"}
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail={"code": "MANIFEST_NOT_FOUND", "message": str(e)})
+    except (json.JSONDecodeError, ValueError) as e:
+        raise HTTPException(status_code=400, detail={"code": "INVALID_MANIFEST", "message": f"Invalid manifest file: {str(e)}"})
+    except MetadataError as e:
+        raise HTTPException(status_code=400, detail=e.to_dict())
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"Unexpected error loading manifest: {e}")
+        raise HTTPException(status_code=500, detail=MetadataError("Failed to load manifest", code="MANIFEST_LOAD_ERROR").to_dict())
 
 class MaterializeRequest(BaseModel):
-    metric: str
-    dimensions: List[str]
-    refresh: str = "auto"
+    metric: str = Field(..., min_length=1, description="Metric name to materialize")
+    dimensions: List[str] = Field(default_factory=list, description="List of dimensions")
+    refresh: str = Field(default="auto", description="Refresh mode: auto, full, or incremental")
+    
+    @field_validator('metric')
+    @classmethod
+    def validate_metric(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Metric name cannot be empty")
+        return v.strip()
+    
+    @field_validator('refresh')
+    @classmethod
+    def validate_refresh(cls, v: str) -> str:
+        allowed = {"auto", "full", "incremental"}
+        if v not in allowed:
+            raise ValueError(f"Refresh mode must be one of: {', '.join(allowed)}")
+        return v
 
 class MartRequest(BaseModel):
     name: str
@@ -681,8 +963,21 @@ def create_materialization(req: MaterializeRequest):
     mat = Materializer(indexer)
     try:
         return mat.materialize_metric(req.metric, req.dimensions, req.refresh)
+    except QueryError as se:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": se.code, "message": str(se), "hint": se.hint}
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail={"code": "VALIDATION_ERROR", "message": str(ve)})
+    except (snowflake.connector.errors.DatabaseError, snowflake.connector.errors.ProgrammingError) as e:
+        raise HTTPException(status_code=400, detail={"code": "SNOWFLAKE_ERROR", "message": str(e)})
+    except QueryError as e:
+        logger.warning(f"Query error materializing metric: {e}")
+        raise HTTPException(status_code=400, detail=e.to_dict())
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"Unexpected error materializing metric: {e}")
+        raise HTTPException(status_code=500, detail=MetadataError("Failed to materialize metric", code="MATERIALIZATION_ERROR").to_dict())
 
 @app.post("/materialize/refresh")
 def refresh_materialization(req: MaterializeRequest):
@@ -691,8 +986,21 @@ def refresh_materialization(req: MaterializeRequest):
     mat = Materializer(indexer)
     try:
         return mat.materialize_metric(req.metric, req.dimensions, "auto")
+    except QueryError as se:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": se.code, "message": str(se), "hint": se.hint}
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail={"code": "VALIDATION_ERROR", "message": str(ve)})
+    except (snowflake.connector.errors.DatabaseError, snowflake.connector.errors.ProgrammingError) as e:
+        raise HTTPException(status_code=400, detail={"code": "SNOWFLAKE_ERROR", "message": str(e)})
+    except QueryError as e:
+        logger.warning(f"Query error refreshing materialization: {e}")
+        raise HTTPException(status_code=400, detail=e.to_dict())
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"Unexpected error refreshing materialization: {e}")
+        raise HTTPException(status_code=500, detail=MetadataError("Failed to refresh materialization", code="MATERIALIZATION_ERROR").to_dict())
 
 @app.post("/mart")
 def create_mart(req: MartRequest):
@@ -701,30 +1009,80 @@ def create_mart(req: MartRequest):
     mat = Materializer(indexer)
     try:
         return mat.create_mart(req.name, req.metrics, req.dimensions)
+    except QueryError as se:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": se.code, "message": str(se), "hint": se.hint}
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail={"code": "VALIDATION_ERROR", "message": str(ve)})
+    except (snowflake.connector.errors.DatabaseError, snowflake.connector.errors.ProgrammingError) as e:
+        raise HTTPException(status_code=400, detail={"code": "SNOWFLAKE_ERROR", "message": str(e)})
+    except QueryError as e:
+        logger.warning(f"Query error creating mart: {e}")
+        raise HTTPException(status_code=400, detail=e.to_dict())
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"Unexpected error creating mart: {e}")
+        raise HTTPException(status_code=500, detail=MetadataError("Failed to create mart", code="MART_CREATION_ERROR").to_dict())
 
 @app.get("/cache")
 def get_cache_stats():
-    indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
-    conn = indexer._get_conn()
-    c = conn.cursor()
-    c.execute("SELECT count(*) FROM cache_entries")
-    count = c.fetchone()[0]
-    conn.close()
-    return {"entries": count}
+    try:
+        indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
+        conn = indexer._get_conn()
+        c = conn.cursor()
+        c.execute("SELECT count(*) FROM cache_entries")
+        count = c.fetchone()[0]
+        conn.close()
+        return {"entries": count}
+    except DatabaseError as e:
+        raise HTTPException(status_code=500, detail=e.to_dict())
+    except sqlite3.OperationalError as e:
+        logger.warning(f"Database error getting cache stats: {e}")
+        return {"entries": 0}
+    except DatabaseError as e:
+        logger.warning(f"Database error getting cache stats: {e}")
+        return {"entries": 0}
+    except Exception as e:
+        logger.error(f"Unexpected error getting cache stats: {e}")
+        return {"entries": 0}
 
 @app.delete("/cache")
 def clear_cache(metric: str = None):
-    indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
-    from axi.cache.query_cache import QueryCache
-    cache = QueryCache(indexer)
-    cache.clear(metric)
-    return {"status": "cleared"}
+    # Sanitize metric name if provided
+    if metric:
+        try:
+            metric = validate_metric_name(metric)
+        except ValueError as ve:
+            raise HTTPException(status_code=400, detail=ValidationError(str(ve), code="INVALID_METRIC_NAME").to_dict())
+    
+    try:
+        indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
+        from axi.cache.query_cache import QueryCache
+        cache = QueryCache(indexer)
+        cache.clear(metric)
+        return {"status": "cleared"}
+    except DatabaseError as e:
+        raise HTTPException(status_code=500, detail=e.to_dict())
+    except sqlite3.OperationalError as e:
+        logger.warning(f"Database error clearing cache: {e}")
+        raise HTTPException(status_code=500, detail={"code": "DATABASE_ERROR", "message": "Failed to clear cache"})
+    except DatabaseError as e:
+        logger.warning(f"Database error clearing cache: {e}")
+        raise HTTPException(status_code=500, detail=e.to_dict())
+    except Exception as e:
+        logger.error(f"Unexpected error clearing cache: {e}")
+        raise HTTPException(status_code=500, detail=MetadataError("Failed to clear cache", code="CACHE_ERROR").to_dict())
 
 def run():
+    """Run the API server."""
     import uvicorn
-    uvicorn.run("axi.api.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(
+        "axi.api.main:app",
+        host=settings.api_host,
+        port=settings.api_port,
+        reload=settings.debug
+    )
 
 if __name__ == "__main__":
     run()

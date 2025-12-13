@@ -11,13 +11,17 @@ import os
 from axi.config.settings import get_settings
 from axi.metadata.indexer import MetadataIndexer
 from axi.query.engine import SemanticQueryEngine
+from axi.exceptions import QueryError
 from axi.execution.snowflake_runner import SnowflakeRunner
+from axi.utils.sanitization import validate_dimension_name, sanitize_filter_value
+from axi.utils.logging_config import get_logger
 
 router = APIRouter(prefix="/api/query", tags=["query"])
 settings = get_settings()
+logger = get_logger(__name__)
 
 def _get_indexer():
-    return MetadataIndexer(settings.AXI_METADATA_DIR)
+    return MetadataIndexer(settings.metadata_dir)
 
 class FilterItem(BaseModel):
     dimension: str
@@ -27,20 +31,13 @@ class FilterItem(BaseModel):
     @field_validator('dimension')
     @classmethod
     def validate_dimension(cls, v: str) -> str:
-        if not v or not v.strip():
-            raise ValueError("Dimension cannot be empty")
-        # Basic validation - no SQL injection characters
-        if any(char in v for char in [';', '--', '/*', '*/', 'DROP', 'DELETE', 'UPDATE', 'INSERT']):
-            raise ValueError("Invalid dimension name")
-        return v.strip()
+        return validate_dimension_name(v)
     
     @field_validator('value')
     @classmethod
     def validate_value(cls, v: Any, info) -> Any:
         op = info.data.get('op')
-        if op == 'IN' and not isinstance(v, list):
-            raise ValueError("IN operator requires a list value")
-        return v
+        return sanitize_filter_value(v, op) if op else v
 
 class SemanticQueryRequest(BaseModel):
     metrics: List[str]
@@ -296,19 +293,27 @@ def run_semantic_query(req: SemanticQueryRequest):
         except snowflake.connector.errors.DatabaseError as de:  # type: ignore
             raise HTTPException(status_code=401, detail={"code": "SNOWFLAKE_AUTH_FAILED", "message": str(de)})
         except Exception as e:
+            logger.error(f"Snowflake connection error: {e}")
             raise HTTPException(status_code=500, detail={"code": "SNOWFLAKE_CONNECTION_ERR", "message": str(e)})
-    except SemanticQueryEngine.SemanticError as se:  # type: ignore
-        raise HTTPException(status_code=400, detail={"code": se.code, "message": str(se), "hint": se.hint})
+    except QueryError as se:
+        logger.warning(f"Query error: {se}")
+        raise HTTPException(status_code=400, detail=se.to_dict())
     except HTTPException:
         raise
+    except QueryError as e:
+        logger.warning(f"Query error: {e}")
+        raise HTTPException(status_code=400, detail=e.to_dict())
     except Exception as e:
-        raise HTTPException(status_code=400, detail={"code": "METRIC_INVALID", "message": str(e)})
+        logger.error(f"Unexpected error: {e}")
+        logger.error(f"Unexpected error in semantic query: {e}")
+        raise HTTPException(status_code=400, detail=QueryError(f"Failed to run semantic query: {e}", code="SEMANTIC_QUERY_ERROR").to_dict())
 
 @router.post("/semantic/sql-only")
 def generate_sql_only(req: SemanticQueryRequest):
     """
     Generate SQL without executing.
     """
+    logger.info(f"Generating SQL for metrics: {req.metrics}")
     try:
         indexer = _get_indexer()
         engine = SemanticQueryEngine(indexer)
@@ -355,9 +360,14 @@ def generate_sql_only(req: SemanticQueryRequest):
                 filter_strings,
                 dialect="snowflake"
             )
+        except QueryError as e:
+            logger.warning(f"Query error generating SQL: {e}")
+            raise HTTPException(status_code=400, detail=e.to_dict())
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"METRIC_INVALID: {e}")
+            logger.error(f"Unexpected error generating SQL: {e}")
+            raise HTTPException(status_code=400, detail=QueryError(f"Failed to generate SQL: {e}", code="SQL_GENERATION_ERROR").to_dict())
         
+        logger.debug(f"Successfully generated SQL for {len(req.metrics)} metrics")
         return {
             "sql": sql,
             "columns": [],
@@ -371,7 +381,10 @@ def generate_sql_only(req: SemanticQueryRequest):
         }
     except HTTPException:
         raise
+    except QueryError as e:
+        raise HTTPException(status_code=400, detail=e.to_dict())
     except Exception as e:
+        logger.error(f"Unexpected error in SQL generation: {e}")
         # Return more detailed error message
         error_detail = str(e)
         if "ENTITY_UNRESOLVED" in error_detail:
@@ -385,6 +398,7 @@ def get_query_plan(req: SemanticQueryRequest):
     """
     Return join graph debug output for query planning.
     """
+    logger.debug(f"Generating query plan for metrics: {req.metrics}")
     indexer = _get_indexer()
     engine = SemanticQueryEngine(indexer)
     
@@ -413,7 +427,11 @@ def get_query_plan(req: SemanticQueryRequest):
         }
     except HTTPException:
         raise
+    except QueryError as e:
+        logger.warning(f"Query error: {e}")
+        raise HTTPException(status_code=400, detail=e.to_dict())
     except Exception as e:
+        logger.error(f"Unexpected error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/semantic/reachable-dimensions")
@@ -422,6 +440,7 @@ def get_reachable_dimensions(req: SemanticQueryRequest):
     Get reachable dimensions for the given metrics.
     Returns a flat list of dimension names that can be joined to the metrics.
     """
+    logger.debug(f"Getting reachable dimensions for metrics: {req.metrics}")
     indexer = _get_indexer()
     engine = SemanticQueryEngine(indexer)
     
@@ -451,7 +470,11 @@ def get_reachable_dimensions(req: SemanticQueryRequest):
         }
     except HTTPException:
         raise
+    except QueryError as e:
+        logger.warning(f"Query error: {e}")
+        raise HTTPException(status_code=400, detail=e.to_dict())
     except Exception as e:
+        logger.error(f"Unexpected error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -460,10 +483,19 @@ def run_sql(req: RunSqlRequest):
     """
     Execute SQL against Snowflake with credential validation and error mapping.
     """
+    logger.info("Executing raw SQL query")
+    # Sanitize SQL input
+    from axi.utils.sanitization import sanitize_sql_fragment
     if not req.sql or not req.sql.strip():
-        raise HTTPException(status_code=400, detail="SQL_REQUIRED")
+        raise HTTPException(status_code=400, detail=ValidationError("SQL is required", code="SQL_REQUIRED").to_dict())
 
     sql = req.sql.strip()
+    # Basic validation - sanitize SQL fragment
+    try:
+        sql = sanitize_sql_fragment(sql)
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=ValidationError(str(ve), code="INVALID_SQL").to_dict())
+    
     if req.limit and req.limit > 0 and "limit" not in sql.lower():
         sql = f"{sql.rstrip(';')} LIMIT {req.limit}"
 
@@ -471,6 +503,7 @@ def run_sql(req: RunSqlRequest):
     try:
         rows, cols, elapsed = runner.execute_query(sql)
         row_list = [[row.get(c) for c in cols] for row in rows]
+        logger.debug(f"SQL query executed successfully: {len(row_list)} rows in {elapsed}ms")
         return {
             "sql": sql,
             "columns": cols,
@@ -479,10 +512,14 @@ def run_sql(req: RunSqlRequest):
             "execution_ms": elapsed
         }
     except ValueError as ve:
-        raise HTTPException(status_code=400, detail=f"MISSING_CREDENTIALS: {ve}")
+        logger.warning(f"Missing Snowflake credentials: {ve}")
+        raise HTTPException(status_code=400, detail=ValidationError(str(ve), code="MISSING_CREDENTIALS").to_dict())
     except snowflake.connector.errors.ProgrammingError as pe:  # type: ignore
-        raise HTTPException(status_code=400, detail=f"SQL_SYNTAX_ERROR: {pe}")
+        logger.warning(f"SQL syntax error: {pe}")
+        raise HTTPException(status_code=400, detail=QueryError(str(pe), code="SQL_SYNTAX_ERROR").to_dict())
     except snowflake.connector.errors.DatabaseError as de:  # type: ignore
-        raise HTTPException(status_code=401, detail=f"SNOWFLAKE_AUTH_FAILED: {de}")
+        logger.warning(f"Snowflake authentication failed: {de}")
+        raise HTTPException(status_code=401, detail=DatabaseError(str(de), code="SNOWFLAKE_AUTH_FAILED").to_dict())
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"CONNECTION_ERROR: {e}")
+        logger.error(f"Unexpected error executing SQL: {e}")
+        raise HTTPException(status_code=500, detail=DatabaseError(f"Connection error: {e}", code="CONNECTION_ERROR").to_dict())
