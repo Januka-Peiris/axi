@@ -886,5 +886,51 @@ def snowflake(
     else:
         typer.echo(f"Unknown action: {action}")
 
+@app.command()
+def demo(
+    output: str = typer.Option("./demo_project", "--output", "-o", help="Output directory for demo project"),
+    force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing files"),
+    extract: bool = typer.Option(True, "--extract/--no-extract", help="Run extraction after generating"),
+):
+    """
+    Generate a sample e-commerce project for demos and testing.
+
+    Creates:
+    - Sample SQL models (orders, customers, products)
+    - axi.yml configuration
+    - Glossary terms
+
+    Example:
+        axi demo --output ./my_demo
+        axi demo --force --extract
+    """
+    from axi.demo import generate_sample_project
+
+    typer.echo(f"Generating sample project in {output}...")
+
+    stats = generate_sample_project(output, force=force)
+
+    typer.echo(f"Created {stats['models']} models, {stats['glossary']} glossary terms, {stats['config']} config file")
+
+    if extract:
+        typer.echo("\nRunning extraction...")
+        import os
+        original_dir = os.getcwd()
+        try:
+            os.chdir(output)
+            # Run extraction
+            indexer = MetadataIndexer(os.path.join(output, "metadata_store"))
+            from axi.extractor.core import MetadataExtractor
+            extractor = MetadataExtractor(indexer, base_path=output)
+            result = extractor.extract_all()
+            typer.echo(f"Extracted {result.get('models_extracted', 0)} models, {result.get('metrics_extracted', 0)} metrics")
+        finally:
+            os.chdir(original_dir)
+
+    typer.echo(f"\n[green]Demo project ready![/green]")
+    typer.echo(f"Next steps:")
+    typer.echo(f"  cd {output}")
+    typer.echo(f"  axi ui")
+
 if __name__ == "__main__":
     app()

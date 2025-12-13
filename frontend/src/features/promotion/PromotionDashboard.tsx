@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, endpoints } from '../../api/client';
 import { Database, CheckCircle2, XCircle, AlertCircle, Search, ChevronDown, ChevronRight } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
+import { Onboarding } from '../../components/Onboarding';
 
 interface PromotionResult {
     id?: number;
@@ -46,6 +47,7 @@ export const PromotionDashboard = () => {
     const [sourceFilter, setSourceFilter] = useState<string>('all');
     const [reasonFilter, setReasonFilter] = useState<string>('all');
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+    const [showOnboarding, setShowOnboarding] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -54,7 +56,17 @@ export const PromotionDashboard = () => {
                 const response = await api.get(endpoints.promotion);
                 setData(response.data);
                 setError(null);
+                // Show onboarding if no data extracted
+                if (response.data?.counts?.total_scanned === 0) {
+                    setShowOnboarding(true);
+                }
             } catch (err: any) {
+                // Show onboarding on 404 or connection error (no project set up)
+                if (err.response?.status === 404 || err.code === 'ERR_NETWORK') {
+                    setShowOnboarding(true);
+                    setLoading(false);
+                    return;
+                }
                 setError(err.message || 'Failed to load promotion data');
                 console.error('Failed to load promotion data:', err);
             } finally {
@@ -140,6 +152,14 @@ export const PromotionDashboard = () => {
                         </div>
                     </div>
                 </div>
+            </div>
+        );
+    }
+
+    if (showOnboarding) {
+        return (
+            <div className="p-8 max-w-7xl mx-auto">
+                <Onboarding onDismiss={() => setShowOnboarding(false)} />
             </div>
         );
     }
