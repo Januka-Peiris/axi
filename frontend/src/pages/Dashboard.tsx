@@ -45,7 +45,7 @@ export const Dashboard = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="card h-64 flex items-center justify-center border-dashed border-2 bg-transparent">
-                    <p className="text-text-secondary">Recent Activity (Comming Soon)</p>
+                    <p className="text-text-secondary">Recent Activity (Coming Soon)</p>
                 </div>
                 <div className="card h-64 flex items-center justify-center border-dashed border-2 bg-transparent">
                     <p className="text-text-secondary">System Health (Coming Soon)</p>

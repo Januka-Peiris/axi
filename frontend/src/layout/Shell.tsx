@@ -1,8 +1,9 @@
 
 import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, Database, BarChart3, Layers, Network, Terminal, Settings, BookOpen, Bookmark } from 'lucide-react';
+import { LayoutDashboard, Database, BarChart3, Layers, Network, Terminal, Settings, BookOpen, Bookmark, GitFork, Command, Search } from 'lucide-react';
 import clsx from 'clsx';
+import { CommandPalette } from '../components/CommandPalette';
 
 const NavItem = ({ to, icon: Icon, label }: { to: string; icon: any; label: string }) => (
     <NavLink
@@ -18,8 +19,12 @@ const NavItem = ({ to, icon: Icon, label }: { to: string; icon: any; label: stri
 );
 
 export const Shell: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
+    const [commandPaletteOpen, setCommandPaletteOpen] = React.useState(false);
+
     return (
         <div className="flex h-screen bg-[#0d0f15] text-slate-200 selection:bg-cyan-500/30">
+            {/* Command Palette */}
+            <CommandPalette />
 
             {/* Sidebar */}
             <div className="w-64 border-r border-white/5 flex flex-col bg-[#151821]">
@@ -30,12 +35,34 @@ export const Shell: React.FC<{ children?: React.ReactNode }> = ({ children }) =>
                     <div className="text-xs text-slate-500 mt-1 font-mono">v0.1.0-alpha</div>
                 </div>
 
+                {/* Quick Search Button */}
+                <div className="px-3 mb-2">
+                    <button
+                        onClick={() => {
+                            const event = new KeyboardEvent('keydown', {
+                                key: 'k',
+                                metaKey: true,
+                                bubbles: true
+                            });
+                            window.dispatchEvent(event);
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-500 bg-black/20 border border-white/5 rounded-lg hover:border-cyan-500/30 hover:text-slate-400 transition-colors"
+                    >
+                        <Search className="w-4 h-4" />
+                        <span className="flex-1 text-left">Quick search...</span>
+                        <span className="flex items-center gap-1 text-xs bg-white/5 px-1.5 py-0.5 rounded">
+                            <Command className="w-3 h-3" />K
+                        </span>
+                    </button>
+                </div>
+
                 <nav className="flex-1 px-3 space-y-1">
                     <div className="px-4 py-2 text-xs font-bold text-slate-600 uppercase tracking-widest mt-4 mb-2">Platform</div>
                     <NavItem to="/" icon={LayoutDashboard} label="Dashboard" />
                     <NavItem to="/models" icon={Database} label="Models" />
                     <NavItem to="/metrics" icon={BarChart3} label="Metrics" />
                     <NavItem to="/dimensions" icon={Layers} label="Dimensions" />
+                    <NavItem to="/graph" icon={GitFork} label="Graph" />
 
 
 

@@ -16,6 +16,10 @@ const DimensionDetailPage = lazy(() => import('./features/dimensions/DimensionDe
 const MetricsListPage = lazy(() => import('./features/metrics/MetricsListPage').then(m => ({ default: m.MetricsListPage })));
 const MetricDetailPage = lazy(() => import('./features/metrics/MetricDetailPage').then(m => ({ default: m.MetricDetailPage })));
 const SemanticQueryPage = lazy(() => import('./features/query/SemanticQueryPage').then(m => ({ default: m.SemanticQueryPage })));
+const SettingsPage = lazy(() => import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage })));
+const GraphExplore = lazy(() => import('./pages/GraphExplore').then(m => ({ default: m.GraphExplore })));
+const GraphExplorer = lazy(() => import('./pages/GraphExplorer').then(m => ({ default: m.GraphExplorer })));
+const MetricCompare = lazy(() => import('./pages/MetricCompare').then(m => ({ default: m.MetricCompare })));
 
 // Use HashRouter for simpler local file execution if needed, but BrowserRouter is fine for Vite
 // Using HashRouter ensures reloading works easily without server config for SPA
@@ -31,6 +35,7 @@ export default function App() {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/models" element={<Models />} />
               <Route path="/metrics" element={<MetricsListPage />} />
+              <Route path="/metrics/compare" element={<MetricCompare />} />
               <Route path="/metrics/:metricId" element={<MetricDetailPage />} />
               <Route path="/dimensions" element={<DimensionsListPage />} />
               <Route path="/dimensions/:dimensionId" element={<DimensionDetailPage />} />
@@ -39,10 +44,18 @@ export default function App() {
               <Route path="/query" element={<SemanticQueryPage />} />
               <Route path="/query/legacy" element={<QueryRunner />} />
 
+              {/* Graph Routes */}
+              <Route path="/graph" element={<GraphExplore />} />
+              <Route path="/graph/explore" element={<GraphExplore />} />
+              <Route path="/graph/full" element={<GraphExplorer />} />
+
 
               {/* Docs Routes */}
               <Route path="/docs" element={<DocsPage />} />
               <Route path="/docs/:slug" element={<DocsPage />} />
+
+              {/* Settings */}
+              <Route path="/settings" element={<SettingsPage />} />
 
               <Route path="*" element={<div className="p-8">404 - Not Found</div>} />
             </Route>

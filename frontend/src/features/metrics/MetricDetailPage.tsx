@@ -17,6 +17,10 @@ import {
   DeleteConfirmModal,
 } from './components';
 import { LocalSubgraph } from '../../components/graph/LocalSubgraph';
+import { LineageView } from '../../components/LineageView';
+import { DataQualityIndicators } from '../../components/DataQualityIndicators';
+import { Comments } from '../../components/Comments';
+import { VersionHistory } from '../../components/VersionHistory';
 
 export const MetricDetailPage: React.FC = () => {
   const { metricId } = useParams<{ metricId: string }>();
@@ -161,11 +165,18 @@ export const MetricDetailPage: React.FC = () => {
         <MetricExpression expression={metric.expression} />
       </div>
 
+      {/* Lineage View */}
+      <div className="p-6 rounded-xl bg-[#151821] border border-white/10">
+        <h2 className="text-lg font-bold text-white mb-2">Data Lineage</h2>
+        <p className="text-sm text-slate-500 mb-4">Shows upstream sources and downstream usage</p>
+        <LineageView metricName={metric.name} />
+      </div>
+
       {/* Local Subgraph */}
       <div className="space-y-4">
         <h2 className="text-xl font-bold text-white">Graph View</h2>
-        <LocalSubgraph 
-          nodeId={`metric.${metric.name}`} 
+        <LocalSubgraph
+          nodeId={`metric.${metric.name}`}
           depth={1}
           height="400px"
         />
@@ -223,7 +234,19 @@ export const MetricDetailPage: React.FC = () => {
         </div>
 
         {/* Sidebar */}
-        <div className="space-y-8">
+        <div className="space-y-6">
+          {/* Data Quality */}
+          <DataQualityIndicators
+            entityType="metric"
+            entityData={{
+              name: metric.name,
+              expression: metric.expression,
+              entity: metric.entity_name || metric.entity,
+              dimensions: metric.default_dimensions,
+              type: metric.type
+            }}
+          />
+
           {/* Metadata */}
           <div className="p-6 rounded-xl bg-[#151821] border border-white/10 space-y-4">
             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">
@@ -272,6 +295,25 @@ export const MetricDetailPage: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* Version History */}
+          <VersionHistory
+            entityType="metric"
+            entityId={metric.name}
+            currentData={{
+              name: metric.name,
+              expression: metric.expression,
+              type: metric.type,
+              entity: metric.entity_name || metric.entity,
+              description: metric.description
+            }}
+          />
+
+          {/* Comments */}
+          <Comments
+            entityType="metric"
+            entityId={metric.name}
+          />
         </div>
       </div>
 
