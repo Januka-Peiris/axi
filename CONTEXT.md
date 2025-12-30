@@ -1,177 +1,148 @@
-📄 AXI — AI CONTEXT FILE (v1.0)
+# AXI - AI Context File (v1.0)
 
-The semantic layer product in the msh ecosystem
+> The semantic layer product in the msh ecosystem
 
-🔷 PRODUCT NAME
+## Product Name
 
-AXI — A semantic layer built from SQL.
-Meaning inspired by “axiom” → a fundamental truth.
+**AXI** - A semantic layer built from SQL.
 
-🔷 PRODUCT PURPOSE
+The name is inspired by "axiom" - a fundamental truth.
+
+## Product Purpose
 
 AXI extracts meaning from SQL models to create:
+- A business-friendly semantic layer
+- A metric glossary
+- A dimension model
+- A no-SQL metric query engine
 
-a business-friendly semantic layer,
-
-a metric glossary,
-
-a dimension model,
-
-and a no-SQL metric query engine,
-
-powered entirely by existing SQL, without requiring:
-
-YAML
-
-LookML
-
-Semantic DSLs
-
-Proprietary modeling
+All powered by existing SQL, without requiring YAML, LookML, Semantic DSLs, or proprietary modeling.
 
 AXI works independently OR inside the msh ecosystem, but is not part of msh itself.
 
-🧩 HIGH-LEVEL DESCRIPTION
+## High-Level Description
 
 AXI:
+- Reads SQL from dbt Core, Snowflake, msh, or raw `.sql` files
+- Extracts metrics, dimensions, grains, filters, and source tables
+- Stores them in metadata JSON + SQLite index
+- Provides a FastAPI backend for semantic querying
+- Generates SQL dynamically and executes it in Snowflake
+- Supports a React UI for business-friendly exploration
+- Only extracts models that are promoted
 
-Reads SQL from dbt Core, Snowflake, msh, or raw .sql files
+## Promotion Model
 
-Extracts metrics, dimensions, grains, filters, and source tables
+AXI only extracts metadata from **promoted** models/tables, using:
 
-Stores them in metadata JSON + SQLite index
-
-Provides a FastAPI backend for semantic querying
-
-Generates SQL dynamically and executes it in Snowflake
-
-Supports a React UI for business-friendly exploration
-
-Only extracts models that are promoted
-
-🧩 PROMOTION MODEL (CRITICAL)
-
-AXI must only extract metadata from promoted models/tables, using:
-
-1. Tag-based promotion
+### 1. Tag-based Promotion
 
 Works in dbt, Snowflake, and msh:
 
-dbt
+**dbt:**
+```yaml
 tags: ["axi"]
+```
 
-
-or SQL comment:
-
+Or SQL comment:
+```sql
 -- axi: true
+```
 
-Snowflake
+**Snowflake:**
+```sql
+ALTER TABLE analytics.mrr SET TAG axi = 'true';
+```
 
-Using table tags:
-
-alter table analytics.mrr set tag axi = 'true';
-
-msh
-
-Inside .msh file:
-
+**msh:**
+```yaml
 axi: true
+```
 
-2. Folder-based promotion (dbt only)
+### 2. Folder-based Promotion (dbt only)
 
-Any model inside included folders is promoted.
+Any model inside included folders is promoted:
 
-Example config:
-
+```yaml
 include:
   folders:
     - models/axi
     - models/business
+```
 
-3. Include/Exclude Rules
+### 3. Include/Exclude Rules
 
-Main config file: axi.yml
+Main config file: `axi.yml`
 
+```yaml
 include:
   tags: ["axi"]
   folders: ["models/axi"]
 exclude:
   folders: ["raw/", "staging/"]
   tags: ["ignore"]
+```
 
-
-Promotion logic:
-
+**Promotion logic:**
+```
 PROMOTED IF:
-  (dbt/msh/Snowflake tag == axi) 
+  (dbt/msh/Snowflake tag == axi)
   OR folder matches include rule
 EXCEPT WHEN:
   file or folder matches exclusion rule
-
+```
 
 This ensures clean, intentional semantic modeling.
 
-🧠 ARCHITECTURE OVERVIEW
+## Architecture Overview
 
-Repo structure:
+### Repo Structure
 
+```
 axi/
-  backend/
-    axi/
-      config/
-      extractor/
-      metadata/
-      api/
-  frontend/
-    src/
-  axi-cli/
+├── backend/
+│   └── axi/
+│       ├── config/
+│       ├── extractor/
+│       ├── metadata/
+│       └── api/
+├── frontend/
+│   └── src/
+└── axi-cli/
+```
 
-🧠 BACKEND COMPONENTS
-1. Config Loader
+## Backend Components
 
-Loads axi.yml and exposes:
+### 1. Config Loader
 
-include.tags
+Loads `axi.yml` and exposes:
+- `include.tags`
+- `include.folders`
+- `exclude.tags`
+- `exclude.folders`
 
-include.folders
-
-exclude.tags
-
-exclude.folders
-
-2. Promotion Engine
+### 2. Promotion Engine
 
 Determines whether a model should be extracted:
+- Checks tags
+- Checks folder inclusion
+- Checks exclude rules
 
-checks tags
+### 3. SQL Scanner
 
-checks folder inclusion
+Scans directories and finds `.sql` models. Supports dbt compiled folder, msh assets, and Snowflake extraction.
 
-checks exclude rules
-
-3. SQL Scanner
-
-Scans directories and finds .sql models.
-
-Later:
-Supports dbt compiled folder, msh assets, Snowflake extraction.
-
-4. Metadata Extractor
+### 4. Metadata Extractor
 
 Uses sqlglot to parse SQL and extract:
+- **Metrics**: SUM, COUNT, AVG
+- **Dimensions**: GROUP BY columns
+- **Filters**: WHERE clauses
+- **Grain**: DATE_TRUNC patterns
+- **Source tables**: FROM/JOIN references
 
-metrics (SUM, COUNT, AVG)
-
-dimensions (GROUP BY)
-
-filters (WHERE)
-
-grain (DATE_TRUNC)
-
-source tables (FROM/JOIN)
-
-Output example:
-
+**Output example:**
+```json
 {
   "model": "mrr",
   "metrics": [
@@ -185,46 +156,38 @@ Output example:
   "filters": ["status = 'active'"],
   "source_tables": ["subscription_charges"]
 }
+```
 
-5. Metadata Storage
+### 5. Metadata Storage
 
 Two layers:
 
-A) JSON files
+**A) JSON files** stored under:
+```
+metadata_store/models/<model_name>.json
+```
 
-Stored under:
+**B) SQLite index** for fast lookup with tables:
+- metrics
+- models
+- dimensions
+- relationships
 
-axi/metadata/models/<model_name>.json
+### 6. Semantic Query Engine
 
-B) SQLite index
+Generates SQL dynamically from metadata.
 
-For fast lookup and querying.
-
-Tables:
-
-metrics
-
-models
-
-dimensions
-
-relationships (later)
-
-6. Semantic Query Engine
-
-Generates SQL dynamically from metadata:
-
-Inputs:
-
+**Input:**
+```json
 {
   "metric": "mrr",
   "dimensions": ["month"],
   "filters": ["region = 'EU'"]
 }
+```
 
-
-Outputs SQL:
-
+**Output:**
+```sql
 SELECT
   month,
   SUM(amount) AS mrr
@@ -232,120 +195,59 @@ FROM subscription_charges
 WHERE status = 'active'
   AND region = 'EU'
 GROUP BY month;
-
+```
 
 Executes in Snowflake via connector.
 
-🧠 FASTAPI BACKEND
+## FastAPI Backend
 
-Endpoints:
+**Endpoints:**
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | /extract | Run metadata extraction |
+| GET | /metrics | List metrics |
+| GET | /metrics/:id | Metric detail |
+| POST | /query | Run semantic query |
+| GET | /models | List promoted models |
 
-POST /extract      → run metadata extraction
-GET  /metrics      → list metrics
-GET  /metrics/:id  → metric detail
-POST /query        → run semantic query
-GET  /models       → list promoted models
+## CLI Tool: `axi`
 
-🧠 CLI TOOL: axi
-
-Commands:
-
+```bash
 axi extract
+axi metrics list
+axi query --metric mrr --dims month
+```
 
-axi list metrics
+## Frontend (React)
 
-axi run query --metric mrr --dims month
+MVP Pages:
+- Metrics List
+- Metric Detail
+- Explore Metric
+- Query Result Table
 
-🎨 FRONTEND (REACT) — MVP PAGES
+## Design Principles
 
-Metrics List
+- AXI does not require dbt Cloud
+- AXI works with dbt Core OR Snowflake OR msh OR raw SQL
+- AXI reads SQL as the source of truth
+- No YAML modeling
+- No new DSL
+- No manual dimension/metric definitions
+- Promotion controls what enters the semantic layer
+- Separation from msh but optional integration
 
-Metric Detail
+## Non-Goals (MVP)
 
-Explore Metric
-
-Query Result Table
-
-🧱 STAGE 1 IMPLEMENTATION PLAN
-
-Set up AXI repo (backend, frontend, CLI folders)
-
-Implement config loader
-
-Implement promotion engine
-
-Implement SQL scanner
-
-Implement metadata extractor skeleton
-
-Implement FastAPI bootstrap
-
-Implement CLI scaffold
-
-This produces the backbone of AXI.
-
-🚀 STAGE 2+ (For Future AI Use)
-
-Full metadata extraction via sqlglot
-
-SQLite index builder
-
-Semantic SQL generator
-
-Snowflake connector
-
-UI query builder
-
-dbt package for metadata extraction
-
-integration with msh manifests (optional)
-
-🎯 DESIGN PRINCIPLES
-
-AXI does not require dbt Cloud
-
-AXI works with dbt Core OR Snowflake OR msh OR raw SQL
-
-AXI reads SQL as the source of truth
-
-No YAML modeling
-
-No new DSL
-
-No manual dimension/metric definitions
-
-Promotion controls what enters the semantic layer
-
-Separation from msh but optional integration
-
-🔐 NON-GOALS (MVP)
-
-No lineage graphs yet
-
-No natural language interface
-
-No role-based access control
-
-No joins across models
-
-No materialization
-
-No time-travel SQL
+- No lineage graphs yet
+- No natural language interface
+- No role-based access control
+- No joins across models
+- No materialization
+- No time-travel SQL
 
 Those come later.
 
-✔ This is your AI Context File
+---
 
-You can drop it into:
-
-Cursor AI context
-
-Bolt.new context
-
-v1/dev context
-
-GitHub Copilot workspace
-
-Any agent environment
-
-and the assistant will understand exactly what AXI is and how to develop it.
+*This is an AI Context File. Drop it into Cursor AI, Bolt.new, v1/dev, GitHub Copilot workspace, or any agent environment and the assistant will understand exactly what AXI is and how to develop it.*

@@ -1,0 +1,18 @@
+{{- if .Values.frontend.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "axi-oss.fullname" . }}-frontend
+  labels:
+    {{- include "axi-oss.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  type: {{ .Values.service.frontendType }}
+  ports:
+    - port: {{ .Values.service.frontendPort }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "axi-oss.frontend.selectorLabels" . | nindent 4 }}
+{{- end }}

@@ -2,11 +2,13 @@
 # Usage and rights governed by backend/LICENSE.
 # Change Date: 2027-01-01. Change License: MIT.
 
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Set
 from axi.metadata.indexer import MetadataIndexer
 from axi.query.graph import SemanticGraph
+from axi.query.reachability import SemanticReachability
 from collections import deque
 import logging
+import re
 from axi.utils.logging_config import get_logger
 from axi.utils.sanitization import sanitize_identifier, validate_dimension_name
 from axi.exceptions import QueryError
@@ -17,6 +19,7 @@ class SemanticQueryEngine:
     def __init__(self, indexer: MetadataIndexer):
         self.indexer = indexer
         self.graph = SemanticGraph(indexer)
+        self.reachability = SemanticReachability(indexer)
 
     # SemanticError removed - use QueryError from axi.exceptions instead
 
@@ -175,56 +178,18 @@ class SemanticQueryEngine:
         # Final fallback: empty list (no grain constraint)
         return []
 
-    def get_reachable_dimensions(self, metric_name: str) -> Dict[str, List[str]]:
+    def get_reachable_dimensions(self, metric_name: str) -> Dict[str, Any]:
         """
-        Returns a dictionary of reachable dimensions for a given metric.
-        grouped by model name.
+        Grain-safe, fan-out-safe reachability for a metric.
+        Returns visible and excluded items with reasons.
         """
-        metric = self.indexer.get_metric(metric_name)
-        if not metric:
-            raise ValueError(f"Metric '{metric_name}' not found")
-        
-        source_model = metric.get('model')
-        if not source_model:
-            return {}
-        
-        reachable = {}
-        
-        # 1. Local dimensions
-        # Logic: get model for metric, list dimensions
-        model_def = self.indexer.get_model(source_model)
-        if model_def:
-            reachable[source_model] = model_def.get('dimensions', [])
-            
-        # 2. Related dimensions (BFS)
-        # Find all reachable models in the graph from source_model
-        # Use queue for BFS
-        
-        # We need a list of ALL models, then check reachability? or traverse?
-        # Graph has adj list.
-        
-        # Traverse
-        seen = set([source_model])
-        queue = [source_model]
-        
-        while queue:
-            curr = queue.pop(0)
-            
-            # If current model is not source, get its dims
-            if curr != source_model:
-                m_def = self.indexer.get_model(curr)
-                if m_def:
-                    reachable[curr] = m_def.get('dimensions', [])
-            
-            # Find neighbors
-            if curr in self.graph.adj:
-                for edge in self.graph.adj[curr]:
-                    target = edge['target']
-                    if target not in seen:
-                        seen.add(target)
-                        queue.append(target)
-                        
-        return reachable
+        return self.reachability.reachable_from_metric(metric_name)
+
+    def plan_sqlrunner_context(self, metrics: List[str], entities: List[str]) -> Dict[str, Any]:
+        """
+        Generalized context planning: compatible metrics, dimensions, and joinable entities.
+        """
+        return self.reachability.plan_context(metrics, entities)
     
     def get_allowed_dimensions_for_metric(self, metric_name: str) -> List[str]:
         """
@@ -369,6 +334,22 @@ class SemanticQueryEngine:
 
         base_alias = get_alias(source_model)
 
+        # NEW: Detect entities from referenced metrics in expression
+        expr = metric.get('expression', '')
+        metric_refs = self._extract_metric_references(expr)
+        for ref_name in metric_refs:
+            ref_metric = self.indexer.get_metric(ref_name)
+            if ref_metric:
+                ref_entity = ref_metric.get('entity_name')
+                ref_model = ref_metric.get('model')
+                # If referenced metric is from a different entity, we need to join
+                if ref_entity and ref_entity != entity_name:
+                    target_models.add(ref_model or ref_entity)
+                    logger.debug(f"Added target model '{ref_model or ref_entity}' from referenced metric '{ref_name}'")
+                elif ref_model and ref_model != source_model:
+                    target_models.add(ref_model)
+                    logger.debug(f"Added target model '{ref_model}' from referenced metric '{ref_name}'")
+
         # Parse dimensions, detect target entities and validate existence
         for dim in dimensions:
             # Validate dimension name
@@ -377,16 +358,33 @@ class SemanticQueryEngine:
             except ValueError as e:
                 logger.warning(f"Invalid dimension name: {dim} - {e}")
                 raise QueryError(f"Invalid dimension name: {dim}", code="INVALID_DIMENSION")
-            
+
             sanitize_ident(dim)
             if "." in dim:
+                # Explicit model.dimension format
                 model, col = dim.split(".", 1)
                 target_models.add(model)
                 clean_dims.append((model, col))
             else:
-                # Use entity_name for dimension resolution if available, fallback to source_model
-                dim_model = entity_name or source_model
-                clean_dims.append((dim_model, dim))
+                # Auto-detect which entity this dimension belongs to
+                detected_entity = self._detect_dimension_entity(dim, metric)
+                if detected_entity and detected_entity != entity_name:
+                    # Dimension is from a different entity - need to join
+                    # Get the model for this entity
+                    dim_entity_obj = self.indexer.get_entity(detected_entity)
+                    if dim_entity_obj:
+                        dim_model = dim_entity_obj.get('model') or detected_entity
+                        target_models.add(dim_model)
+                        clean_dims.append((dim_model, dim))
+                        logger.debug(f"Dimension '{dim}' detected from entity '{detected_entity}', will join to '{dim_model}'")
+                    else:
+                        # Entity not found, use dimension as-is
+                        dim_model = entity_name or source_model
+                        clean_dims.append((dim_model, dim))
+                else:
+                    # Dimension is from base entity or detection failed
+                    dim_model = entity_name or source_model
+                    clean_dims.append((dim_model, dim))
 
         # Resolve joins for each target model
         for tgt in target_models:
@@ -602,10 +600,115 @@ class SemanticQueryEngine:
 
         return final_sql
 
-    def _resolve_expression(self, metric: Dict, dialect: str) -> str:
+    def _extract_metric_references(self, expr: str) -> List[str]:
+        """Extract all {metric_name} patterns from expression.
+
+        Args:
+            expr: SQL expression potentially containing {metric_name} references
+
+        Returns:
+            List of metric names referenced in the expression
+
+        Example:
+            "{total_revenue} / {total_orders}" -> ["total_revenue", "total_orders"]
+        """
+        if not expr:
+            return []
+        pattern = r'\{([a-z_][a-z0-9_]*)\}'
+        return re.findall(pattern, expr, re.IGNORECASE)
+
+    def _detect_dimension_entity(self, dim_name: str, metric: Dict) -> Optional[str]:
+        """
+        Find which entity a dimension belongs to.
+
+        First checks dimension_entity_map in metric metadata, then uses reachability.
+
+        Args:
+            dim_name: Name of the dimension
+            metric: Metric definition dictionary
+
+        Returns:
+            Entity name that owns this dimension, or None if not found
+        """
+        # Check dimension_entity_map first (stored in metric metadata)
+        dim_entity_map = metric.get('dimension_entity_map', {})
+        if dim_name in dim_entity_map:
+            return dim_entity_map[dim_name]
+
+        # Fallback to reachability API
+        base_entity = metric.get('entity_name') or metric.get('model')
+        if not base_entity:
+            return None
+
+        try:
+            # Use reachability to find dimension
+            context = self.reachability.plan_context([], [base_entity])
+            for visible_dim in context.get('visible_dimensions', []):
+                if visible_dim['name'] == dim_name:
+                    return visible_dim['entity']
+        except Exception as e:
+            logger.warning(f"Failed to detect entity for dimension '{dim_name}': {e}")
+
+        return None
+
+    def _resolve_expression(self, metric: Dict, dialect: str, _visited: Optional[Set[str]] = None) -> str:
+        """Resolve metric expression, recursively expanding {metric_name} references.
+
+        Args:
+            metric: Metric definition dictionary
+            dialect: SQL dialect (postgres, snowflake, etc.)
+            _visited: Set of metric names already visited (for circular dependency detection)
+
+        Returns:
+            Fully resolved SQL expression
+
+        Raises:
+            QueryError: If circular dependency detected or referenced metric not found
+        """
+        if _visited is None:
+            _visited = set()
+
+        # Circular dependency check
+        metric_name = metric.get('name')
+        if metric_name and metric_name in _visited:
+            raise QueryError(
+                f"Circular dependency detected: metric '{metric_name}' references itself",
+                code="CIRCULAR_DEPENDENCY"
+            )
+
+        # Add current metric to visited set
+        if metric_name:
+            _visited = _visited | {metric_name}
+
         m_type = metric.get('metric_type', 'aggregate')
         expr = metric.get('expression', '')
-        
+
+        # Extract and resolve metric references
+        metric_refs = self._extract_metric_references(expr)
+        if metric_refs:
+            logger.debug(f"Resolving metric references in '{metric_name}': {metric_refs}")
+
+            for ref_name in metric_refs:
+                ref_metric = self.indexer.get_metric(ref_name)
+                if not ref_metric:
+                    raise QueryError(
+                        f"Referenced metric '{ref_name}' not found in expression of metric '{metric_name}'",
+                        code="METRIC_NOT_FOUND"
+                    )
+
+                # Recursively resolve the referenced metric's expression
+                try:
+                    resolved_expr = self._resolve_expression(ref_metric, dialect, _visited)
+                    # Replace {metric_name} with (resolved_expression)
+                    # Wrap in parentheses to preserve operator precedence
+                    expr = expr.replace(f"{{{ref_name}}}", f"({resolved_expr})")
+                    logger.debug(f"Resolved {{" + ref_name + f"}} -> ({resolved_expr[:50]}...)")
+                except Exception as e:
+                    raise QueryError(
+                        f"Failed to resolve metric reference '{ref_name}' in '{metric_name}': {str(e)}",
+                        code="METRIC_RESOLUTION_ERROR"
+                    ) from e
+
         # Check Plugin Registry
         from axi.plugins.registry import METRIC_TYPES_REGISTRY
         if m_type in METRIC_TYPES_REGISTRY:

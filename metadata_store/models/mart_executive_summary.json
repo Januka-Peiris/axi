@@ -1,0 +1,91 @@
+{
+  "model": "mart_executive_summary",
+  "metrics": [],
+  "dimensions": [],
+  "dimension_details": [],
+  "filters": [
+    "NOT invoice_date IS NULL"
+  ],
+  "source_tables": [
+    "final",
+    "fct_sales_invoices",
+    "fct_sales_orders",
+    "date_spine",
+    "monthly_sales",
+    "monthly_orders",
+    "customer_metrics",
+    "growth_metrics"
+  ],
+  "entity": {
+    "name": "mart_executive_summary",
+    "pk": null,
+    "columns": []
+  },
+  "relationships": [
+    {
+      "parent_model": "fct_sales_invoices",
+      "child_model": "mart_executive_summary",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "fct_sales_invoices",
+      "child_model": "mart_executive_summary",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "fct_sales_orders",
+      "child_model": "mart_executive_summary",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "fct_sales_invoices",
+      "child_model": "mart_executive_summary",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "monthly_orders",
+      "child_model": "monthly_sales",
+      "fk_column": "metric_date",
+      "pk_column": "metric_date",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "monthly_orders",
+      "child_model": "mart_executive_summary",
+      "fk_column": "metric_date",
+      "pk_column": "metric_date",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "customer_metrics",
+      "child_model": "monthly_sales",
+      "fk_column": "metric_date",
+      "pk_column": "metric_date",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "customer_metrics",
+      "child_model": "mart_executive_summary",
+      "fk_column": "metric_date",
+      "pk_column": "metric_date",
+      "join_type": "INNER"
+    }
+  ],
+  "grain_status": "ambiguous",
+  "grain_detection": "none",
+  "grain_columns": [],
+  "semantic_intent": "aggregation_like",
+  "semantic_node": "unknown",
+  "grain_scope": "cte",
+  "grain_reasons": [
+    "multiple grouped CTE sources detected without regrouping"
+  ]
+}

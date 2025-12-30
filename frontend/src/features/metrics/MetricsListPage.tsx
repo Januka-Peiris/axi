@@ -7,6 +7,21 @@ import { MetricBuilder } from './components/MetricBuilder';
 type SortField = 'name' | 'entity_name' | 'type';
 type SortDirection = 'asc' | 'desc';
 
+const SortIcon: React.FC<{ field: SortField; activeField: SortField; direction: SortDirection }> = ({
+  field,
+  activeField,
+  direction,
+}) => {
+  if (activeField !== field) {
+    return <ArrowUpDown className="w-3 h-3 text-slate-500" />;
+  }
+  return direction === 'asc' ? (
+    <ArrowUp className="w-3 h-3 text-cyan-400" />
+  ) : (
+    <ArrowDown className="w-3 h-3 text-cyan-400" />
+  );
+};
+
 export const MetricsListPage: React.FC = () => {
   const { data: metrics, isLoading, error } = useMetrics();
   const [search, setSearch] = useState('');
@@ -28,7 +43,7 @@ export const MetricsListPage: React.FC = () => {
   const filteredAndSorted = useMemo(() => {
     if (!metrics) return [];
 
-    let filtered = metrics.filter((m) => {
+    const filtered = metrics.filter((m) => {
       const matchesSearch =
         m.name.toLowerCase().includes(search.toLowerCase()) ||
         (m.entity_name?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
@@ -37,8 +52,7 @@ export const MetricsListPage: React.FC = () => {
       return matchesSearch && matchesType;
     });
 
-    // Sort
-    filtered.sort((a, b) => {
+    const sorted = [...filtered].sort((a, b) => {
       let aVal: string;
       let bVal: string;
 
@@ -64,7 +78,7 @@ export const MetricsListPage: React.FC = () => {
         : bVal.localeCompare(aVal);
     });
 
-    return filtered;
+    return sorted;
   }, [metrics, search, typeFilter, sortField, sortDirection]);
 
   const handleSort = (field: SortField) => {
@@ -74,17 +88,6 @@ export const MetricsListPage: React.FC = () => {
       setSortField(field);
       setSortDirection('asc');
     }
-  };
-
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) {
-      return <ArrowUpDown className="w-3 h-3 text-slate-500" />;
-    }
-    return sortDirection === 'asc' ? (
-      <ArrowUp className="w-3 h-3 text-cyan-400" />
-    ) : (
-      <ArrowDown className="w-3 h-3 text-cyan-400" />
-    );
   };
 
   const truncate = (text: string | null, maxLength: number = 60) => {
@@ -178,7 +181,7 @@ export const MetricsListPage: React.FC = () => {
                       className="flex items-center gap-2 hover:text-white transition-colors"
                     >
                       Metric Name
-                      <SortIcon field="name" />
+                      <SortIcon field="name" activeField={sortField} direction={sortDirection} />
                     </button>
                   </th>
                   <th className="p-4 font-semibold text-slate-300">
@@ -187,7 +190,7 @@ export const MetricsListPage: React.FC = () => {
                       className="flex items-center gap-2 hover:text-white transition-colors"
                     >
                       Entity
-                      <SortIcon field="entity_name" />
+                      <SortIcon field="entity_name" activeField={sortField} direction={sortDirection} />
                     </button>
                   </th>
                   <th className="p-4 font-semibold text-slate-300">
@@ -196,7 +199,7 @@ export const MetricsListPage: React.FC = () => {
                       className="flex items-center gap-2 hover:text-white transition-colors"
                     >
                       Type
-                      <SortIcon field="type" />
+                      <SortIcon field="type" activeField={sortField} direction={sortDirection} />
                     </button>
                   </th>
                   <th className="p-4 font-semibold text-slate-300">Expression</th>
@@ -272,4 +275,3 @@ export const MetricsListPage: React.FC = () => {
     </>
   );
 };
-

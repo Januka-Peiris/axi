@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import client, { isDemoMode } from "./client";
-import { demoGlossary } from "../demo/data";
+import client from "./client";
 
 // --- Types ---
 
@@ -71,74 +70,68 @@ export interface SearchResult {
     type: "entity" | "metric" | "dimension";
 }
 
+export interface GlossaryTerm {
+    term: string;
+    definition: string;
+    status: "draft" | "approved" | "deprecated";
+    version: number;
+    derived_from: string[];
+    applies_to_entities: string[];
+    scope?: string | null;
+    notes?: string | null;
+    synonyms: string[];
+    source: string;
+    created_at?: string;
+    updated_at?: string;
+}
+
 // --- API Functions ---
 
 export const getGlossaryStats = async (): Promise<GlossaryStats> => {
-    if (isDemoMode) return demoGlossary.stats;
     const res = await client.get("/api/glossary/");
     return res.data;
 };
 
 export const getGlossaryEntities = async (): Promise<GlossaryEntity[]> => {
-    if (isDemoMode) return demoGlossary.entities;
     const res = await client.get("/api/glossary/entities");
     return res.data;
 };
 
 export const getGlossaryEntity = async (name: string): Promise<GlossaryEntity> => {
-    if (isDemoMode) {
-        const ent = demoGlossary.entities.find((e) => e.name === name);
-        if (!ent) throw new Error("Entity not found");
-        return ent;
-    }
     const res = await client.get(`/api/glossary/entities/${name}`);
     return res.data;
 };
 
 export const getGlossaryMetrics = async (): Promise<GlossaryMetric[]> => {
-    if (isDemoMode) return demoGlossary.metrics;
     const res = await client.get("/api/glossary/metrics");
     return res.data;
 };
 
 export const getGlossaryMetric = async (name: string): Promise<GlossaryMetric> => {
-    if (isDemoMode) {
-        const met = demoGlossary.metrics.find((m) => m.name === name);
-        if (!met) throw new Error("Metric not found");
-        return met;
-    }
     const res = await client.get(`/api/glossary/metrics/${name}`);
     return res.data;
 };
 
 export const getGlossaryDimension = async (name: string): Promise<GlossaryDimension> => {
-    if (isDemoMode) {
-        // @ts-ignore
-        const dim = demoGlossary.dimensions?.find((d) => d.name === name);
-        if (!dim) throw new Error("Dimension not found");
-        return dim;
-    }
     const res = await client.get(`/api/glossary/dimensions/${name}`);
     return res.data;
 };
 
 export const searchGlossary = async (query: string): Promise<SearchResult[]> => {
-    if (isDemoMode) {
-        const lowerQ = query.toLowerCase();
-        const results: SearchResult[] = [];
-        demoGlossary.entities.forEach(e => {
-            if (e.name.toLowerCase().includes(lowerQ)) results.push({ name: e.name, type: "entity", description: e.description });
-        });
-        demoGlossary.metrics.forEach(m => {
-            if (m.name.toLowerCase().includes(lowerQ)) results.push({ name: m.name, type: "metric", description: m.description });
-        });
-        // @ts-ignore
-        demoGlossary.dimensions?.forEach(d => {
-            if (d.name.toLowerCase().includes(lowerQ)) results.push({ name: d.name, type: "dimension", description: d.description });
-        });
-        return results;
-    }
     const res = await client.get(`/api/glossary/search?q=${query}`);
+    return res.data;
+};
+
+export const getGlossaryTerms = async (params?: { linked_entity?: string; linked_metric?: string; }): Promise<GlossaryTerm[]> => {
+    const query = new URLSearchParams();
+    if (params?.linked_entity) query.append("linked_entity", params.linked_entity);
+    if (params?.linked_metric) query.append("linked_metric", params.linked_metric);
+    const res = await client.get(`/api/glossary/terms${query.toString() ? `?${query.toString()}` : ""}`);
+    return res.data;
+};
+
+export const getGlossaryTerm = async (term: string): Promise<GlossaryTerm> => {
+    const res = await client.get(`/api/glossary/terms/${term}`);
     return res.data;
 };
 
@@ -171,4 +164,12 @@ export const useGlossaryDimension = (name: string) => {
 
 export const useGlossarySearch = (query: string) => {
     return useQuery({ queryKey: ["glossary", "search", query], queryFn: () => searchGlossary(query), enabled: !!query });
+};
+
+export const useGlossaryTerms = (params?: { linked_entity?: string; linked_metric?: string; }) => {
+    return useQuery({ queryKey: ["glossary", "terms", params], queryFn: () => getGlossaryTerms(params) });
+};
+
+export const useGlossaryTerm = (term: string) => {
+    return useQuery({ queryKey: ["glossary", "term", term], queryFn: () => getGlossaryTerm(term), enabled: !!term });
 };

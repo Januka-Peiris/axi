@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Rocket, Terminal, Database, CheckCircle, Copy, ExternalLink } from 'lucide-react';
+import { Rocket, Database, CheckCircle, Copy, ExternalLink } from 'lucide-react';
 
 interface Step {
     id: number;

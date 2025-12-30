@@ -24,7 +24,7 @@ export const QueryRunner = () => {
         try {
             const res = await api.post(endpoints.query, { metric, dimensions });
             setSql(res.data?.sql || JSON.stringify(res.data, null, 2));
-        } catch (e) {
+        } catch {
             setSql("Error generating SQL");
         } finally {
             setLoading(false);

@@ -21,11 +21,12 @@ def create_database_adapter(
     db_name: Optional[str] = None,
     db_user: Optional[str] = None,
     db_password: Optional[str] = None,
+    db_schema: Optional[str] = None,
     **kwargs
 ) -> DatabaseAdapter:
     """
     Create a database adapter based on configuration.
-    
+
     Args:
         db_type: Database type ("sqlite" or "postgres")
         db_path: Path to SQLite database file (for SQLite)
@@ -35,24 +36,25 @@ def create_database_adapter(
         db_name: PostgreSQL database name
         db_user: PostgreSQL user
         db_password: PostgreSQL password
+        db_schema: PostgreSQL schema for multi-tenancy (for PostgreSQL)
         **kwargs: Additional adapter-specific parameters
-    
+
     Returns:
         DatabaseAdapter instance
-    
+
     Raises:
         ValueError: If db_type is not supported or required parameters are missing
     """
     db_type_lower = db_type.lower()
-    
+
     if db_type_lower == "sqlite":
         if not db_path:
             raise ValueError("db_path is required for SQLite")
         return SQLiteAdapter(db_path=db_path, **kwargs)
-    
+
     elif db_type_lower == "postgres" or db_type_lower == "postgresql":
         if db_url:
-            return PostgreSQLAdapter(db_url=db_url, **kwargs)
+            return PostgreSQLAdapter(db_url=db_url, schema=db_schema, **kwargs)
         elif db_host and db_name and db_user:
             return PostgreSQLAdapter(
                 host=db_host,
@@ -60,13 +62,14 @@ def create_database_adapter(
                 database=db_name,
                 user=db_user,
                 password=db_password or "",
+                schema=db_schema,
                 **kwargs
             )
         else:
             raise ValueError(
                 "For PostgreSQL, either db_url or (db_host, db_name, db_user) must be provided"
             )
-    
+
     else:
         raise ValueError(f"Unsupported database type: {db_type}. Use 'sqlite' or 'postgres'.")
 

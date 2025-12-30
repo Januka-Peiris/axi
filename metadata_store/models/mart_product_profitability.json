@@ -1,0 +1,499 @@
+{
+  "model": "mart_product_profitability",
+  "metrics": [
+    {
+      "name": "total_invoices",
+      "expression": "COUNT(DISTINCT il.invoiceid)",
+      "model": "mart_product_profitability",
+      "source_table": "mart_product_profitability",
+      "grain": [
+        "stockitemid"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_line_items",
+      "expression": "COUNT(*)",
+      "model": "mart_product_profitability",
+      "source_table": "mart_product_profitability",
+      "grain": [
+        "stockitemid"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_quantity_sold",
+      "expression": "SUM(il.quantity)",
+      "model": "mart_product_profitability",
+      "source_table": "mart_product_profitability",
+      "grain": [
+        "stockitemid"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_revenue_before_tax",
+      "expression": "SUM(il.extendedprice)",
+      "model": "mart_product_profitability",
+      "source_table": "mart_product_profitability",
+      "grain": [
+        "stockitemid"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_tax_amount",
+      "expression": "SUM(il.taxamount)",
+      "model": "mart_product_profitability",
+      "source_table": "mart_product_profitability",
+      "grain": [
+        "stockitemid"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_revenue_including_tax",
+      "expression": "SUM(il.extendedprice + il.taxamount)",
+      "model": "mart_product_profitability",
+      "source_table": "mart_product_profitability",
+      "grain": [
+        "stockitemid"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_profit",
+      "expression": "SUM(il.lineprofit)",
+      "model": "mart_product_profitability",
+      "source_table": "mart_product_profitability",
+      "grain": [
+        "stockitemid"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "avg_line_profit",
+      "expression": "AVG(il.lineprofit)",
+      "model": "mart_product_profitability",
+      "source_table": "mart_product_profitability",
+      "grain": [
+        "stockitemid"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "avg",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "profit_per_unit",
+      "expression": "SUM(il.lineprofit) / NULLIF(SUM(il.quantity), 0)",
+      "model": "mart_product_profitability",
+      "source_table": "mart_product_profitability",
+      "grain": [
+        "stockitemid"
+      ],
+      "metric_type": "ratio",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "SUM(il.lineprofit)",
+      "denominator": "NULLIF(SUM(il.quantity), 0)",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "avg_selling_price",
+      "expression": "AVG(il.unitprice)",
+      "model": "mart_product_profitability",
+      "source_table": "mart_product_profitability",
+      "grain": [
+        "stockitemid"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "avg",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "min_selling_price",
+      "expression": "MIN(il.unitprice)",
+      "model": "mart_product_profitability",
+      "source_table": "mart_product_profitability",
+      "grain": [
+        "stockitemid"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "min",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "max_selling_price",
+      "expression": "MAX(il.unitprice)",
+      "model": "mart_product_profitability",
+      "source_table": "mart_product_profitability",
+      "grain": [
+        "stockitemid"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "max",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "profit_margin_percentage",
+      "expression": "CASE WHEN SUM(il.extendedprice) > 0 THEN (SUM(il.lineprofit) / SUM(il.extendedprice)) * 100 ELSE 0 END",
+      "model": "mart_product_profitability",
+      "source_table": "mart_product_profitability",
+      "grain": [
+        "stockitemid"
+      ],
+      "metric_type": "ratio",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "CASE WHEN SUM(il.extendedprice) > 0 THEN (SUM(il.lineprofit)",
+      "denominator": "SUM(il.extendedprice)) * 100 ELSE 0 END",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "revenue_per_invoice",
+      "expression": "SUM(il.extendedprice + il.taxamount) /* Performance metrics */ / NULLIF(COUNT(DISTINCT il.invoiceid), 0)",
+      "model": "mart_product_profitability",
+      "source_table": "mart_product_profitability",
+      "grain": [
+        "stockitemid"
+      ],
+      "metric_type": "ratio",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "avg_quantity_per_invoice",
+      "expression": "SUM(il.quantity) / NULLIF(COUNT(DISTINCT il.invoiceid), 0)",
+      "model": "mart_product_profitability",
+      "source_table": "mart_product_profitability",
+      "grain": [
+        "stockitemid"
+      ],
+      "metric_type": "ratio",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "SUM(il.quantity)",
+      "denominator": "NULLIF(COUNT(DISTINCT il.invoiceid), 0)",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "first_sale_date",
+      "expression": "MIN(i.invoice_date)",
+      "model": "mart_product_profitability",
+      "source_table": "mart_product_profitability",
+      "grain": [
+        "stockitemid"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "min",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "last_sale_date",
+      "expression": "MAX(i.invoice_date)",
+      "model": "mart_product_profitability",
+      "source_table": "mart_product_profitability",
+      "grain": [
+        "stockitemid"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "max",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "months_with_sales",
+      "expression": "COUNT(DISTINCT TIMESTAMP_TRUNC(i.invoice_date, MONTH))",
+      "model": "mart_product_profitability",
+      "source_table": "mart_product_profitability",
+      "grain": [
+        "stockitemid"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    }
+  ],
+  "dimensions": [
+    "stockitemid"
+  ],
+  "dimension_details": [
+    {
+      "name": "stockitemid",
+      "included": true,
+      "reason": "group_by",
+      "roles": [
+        "grain"
+      ]
+    }
+  ],
+  "filters": [
+    "_fivetran_deleted = FALSE"
+  ],
+  "source_tables": [
+    "final",
+    "stg__sales__invoicelines",
+    "fct_sales_invoices",
+    "dim_stock_items",
+    "dim_suppliers",
+    "invoice_lines",
+    "invoices",
+    "product_metrics",
+    "stock_items",
+    "suppliers",
+    "enriched_metrics",
+    "ranked_products"
+  ],
+  "entity": {
+    "name": "mart_product_profitability",
+    "pk": "stockitemid",
+    "columns": []
+  },
+  "relationships": [
+    {
+      "parent_model": "stg__sales__invoicelines",
+      "child_model": "mart_product_profitability",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "fct_sales_invoices",
+      "child_model": "mart_product_profitability",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "dim_stock_items",
+      "child_model": "mart_product_profitability",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "dim_suppliers",
+      "child_model": "mart_product_profitability",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "invoices",
+      "child_model": "invoice_lines",
+      "fk_column": "invoiceid",
+      "pk_column": "invoice_id",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "invoices",
+      "child_model": "mart_product_profitability",
+      "fk_column": "invoiceid",
+      "pk_column": "invoice_id",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "stock_items",
+      "child_model": "product_metrics",
+      "fk_column": "stock_item_id",
+      "pk_column": "stock_item_id",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "stock_items",
+      "child_model": "mart_product_profitability",
+      "fk_column": "stock_item_id",
+      "pk_column": "stock_item_id",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "suppliers",
+      "child_model": "stock_items",
+      "fk_column": "supplier_name",
+      "pk_column": "supplier_name",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "suppliers",
+      "child_model": "mart_product_profitability",
+      "fk_column": "supplier_name",
+      "pk_column": "supplier_name",
+      "join_type": "INNER"
+    }
+  ],
+  "grain_status": "clear",
+  "grain_detection": "group_by",
+  "grain_columns": [
+    "stockitemid"
+  ],
+  "semantic_intent": "semantic_candidate",
+  "semantic_node": "product_metrics",
+  "grain_scope": "cte",
+  "grain_reasons": []
+}

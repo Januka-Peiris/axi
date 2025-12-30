@@ -40,6 +40,53 @@ axi ui
 ```
 Then open http://localhost:5173.
 
+## Developer Setup
+Install everything with a single command from the project root:
+```bash
+make install
+```
+This installs:
+- Backend package (`axi-semantic`) in editable mode
+- CLI package (`axi-cli`) in editable mode
+- Frontend dependencies
+
+**Manual Installation** (if you prefer step-by-step):
+```bash
+# Install build tools
+python -m pip install --upgrade pip hatchling
+
+# Install backend and CLI packages
+python -m pip install -e backend
+python -m pip install -e axi-cli
+
+# Install frontend dependencies
+cd frontend && npm install
+```
+
+**Development Commands:**
+```bash
+# Start both backend and frontend
+make dev
+
+# Or start individually
+make backend    # API on http://localhost:8000
+make frontend   # UI on http://localhost:5173
+
+# Run tests
+make test
+
+# Clean build artifacts
+make clean
+
+# See all available commands
+make help
+```
+
+Customize ports with environment variables:
+```bash
+BACKEND_PORT=9000 FRONTEND_PORT=3000 make dev
+```
+
 ## Feature Highlights
 - Semantic extraction (no DSL): metrics, dimensions, grain, entities, relationships, filters, tags, descriptions.
 - Metrics layer: simple, ratios (safe TRY_DIVIDE), semi-additive, derived, time intelligence (previous period, rolling, to-date).

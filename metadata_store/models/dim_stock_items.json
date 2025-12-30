@@ -1,0 +1,185 @@
+{
+  "model": "dim_stock_items",
+  "metrics": [],
+  "dimensions": [
+    "stockitemid"
+  ],
+  "dimension_details": [
+    {
+      "name": "stockitemid",
+      "included": true,
+      "reason": "group_by",
+      "roles": [
+        "grain"
+      ]
+    }
+  ],
+  "filters": [
+    "si._fivetran_deleted = FALSE AND si.validto > CURRENT_DATE"
+  ],
+  "source_tables": [
+    "final",
+    "stg__warehouse__stockitems",
+    "stg__purchasing__suppliers",
+    "stg__warehouse__colors",
+    "stg__warehouse__packagetypes",
+    "stg__warehouse__stockgroups",
+    "stg__warehouse__stockitemstockgroups",
+    "stock_groups",
+    "stock_items_base",
+    "suppliers",
+    "colors",
+    "package_types_unit",
+    "package_types_outer",
+    "stock_item_groups"
+  ],
+  "entity": {
+    "name": "dim_stock_items",
+    "pk": "stockitemid",
+    "columns": []
+  },
+  "relationships": [
+    {
+      "parent_model": "stg__warehouse__stockitems",
+      "child_model": "dim_stock_items",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "stg__purchasing__suppliers",
+      "child_model": "dim_stock_items",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "stg__warehouse__colors",
+      "child_model": "dim_stock_items",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "stg__warehouse__packagetypes",
+      "child_model": "dim_stock_items",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "stg__warehouse__packagetypes",
+      "child_model": "dim_stock_items",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "stg__warehouse__stockgroups",
+      "child_model": "dim_stock_items",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "stg__warehouse__stockitemstockgroups",
+      "child_model": "dim_stock_items",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "stock_groups",
+      "child_model": "stock_item_groups",
+      "fk_column": "stockgroupid",
+      "pk_column": "stockgroupid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "stock_groups",
+      "child_model": "dim_stock_items",
+      "fk_column": "stockgroupid",
+      "pk_column": "stockgroupid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "suppliers",
+      "child_model": "stock_items_base",
+      "fk_column": "supplierid",
+      "pk_column": "supplierid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "suppliers",
+      "child_model": "dim_stock_items",
+      "fk_column": "supplierid",
+      "pk_column": "supplierid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "colors",
+      "child_model": "stock_items_base",
+      "fk_column": "colorid",
+      "pk_column": "colorid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "colors",
+      "child_model": "dim_stock_items",
+      "fk_column": "colorid",
+      "pk_column": "colorid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "package_types_unit",
+      "child_model": "stock_items_base",
+      "fk_column": "unitpackageid",
+      "pk_column": "packagetypeid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "package_types_unit",
+      "child_model": "dim_stock_items",
+      "fk_column": "unitpackageid",
+      "pk_column": "packagetypeid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "package_types_outer",
+      "child_model": "stock_items_base",
+      "fk_column": "outerpackageid",
+      "pk_column": "packagetypeid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "package_types_outer",
+      "child_model": "dim_stock_items",
+      "fk_column": "outerpackageid",
+      "pk_column": "packagetypeid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "stock_item_groups",
+      "child_model": "stock_items_base",
+      "fk_column": "stockitemid",
+      "pk_column": "stockitemid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "stock_item_groups",
+      "child_model": "dim_stock_items",
+      "fk_column": "stockitemid",
+      "pk_column": "stockitemid",
+      "join_type": "INNER"
+    }
+  ],
+  "grain_status": "clear",
+  "grain_detection": "group_by",
+  "grain_columns": [
+    "stockitemid"
+  ],
+  "semantic_intent": "semantic_candidate",
+  "semantic_node": "stock_item_groups",
+  "grain_scope": "cte",
+  "grain_reasons": []
+}

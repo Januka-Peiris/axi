@@ -1,0 +1,178 @@
+{
+  "model": "fct_sales_orders",
+  "metrics": [
+    {
+      "name": "total_lines",
+      "expression": "COUNT(*)",
+      "model": "fct_sales_orders",
+      "source_table": "fct_sales_orders",
+      "grain": [
+        "orderid"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_quantity",
+      "expression": "SUM(quantity)",
+      "model": "fct_sales_orders",
+      "source_table": "fct_sales_orders",
+      "grain": [
+        "orderid"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_amount_before_tax",
+      "expression": "SUM(unitprice * quantity)",
+      "model": "fct_sales_orders",
+      "source_table": "fct_sales_orders",
+      "grain": [
+        "orderid"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_tax_amount",
+      "expression": "SUM((unitprice * quantity) * (taxrate / 100))",
+      "model": "fct_sales_orders",
+      "source_table": "fct_sales_orders",
+      "grain": [
+        "orderid"
+      ],
+      "metric_type": "ratio",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "SUM((unitprice * quantity) * (taxrate",
+      "denominator": "100))",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_amount_including_tax",
+      "expression": "SUM((unitprice * quantity) * (1 + taxrate / 100))",
+      "model": "fct_sales_orders",
+      "source_table": "fct_sales_orders",
+      "grain": [
+        "orderid"
+      ],
+      "metric_type": "ratio",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "SUM((unitprice * quantity) * (1 + taxrate",
+      "denominator": "100))",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    }
+  ],
+  "dimensions": [
+    "orderid"
+  ],
+  "dimension_details": [
+    {
+      "name": "orderid",
+      "included": true,
+      "reason": "group_by",
+      "roles": [
+        "grain"
+      ]
+    }
+  ],
+  "filters": [
+    "o._fivetran_deleted = FALSE"
+  ],
+  "source_tables": [
+    "final",
+    "stg__sales__orders",
+    "stg__sales__orderlines",
+    "order_lines",
+    "orders_base",
+    "order_aggregates"
+  ],
+  "entity": {
+    "name": "fct_sales_orders",
+    "pk": "orderid",
+    "columns": []
+  },
+  "relationships": [
+    {
+      "parent_model": "stg__sales__orders",
+      "child_model": "fct_sales_orders",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "stg__sales__orderlines",
+      "child_model": "fct_sales_orders",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "order_aggregates",
+      "child_model": "orders_base",
+      "fk_column": "orderid",
+      "pk_column": "orderid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "order_aggregates",
+      "child_model": "fct_sales_orders",
+      "fk_column": "orderid",
+      "pk_column": "orderid",
+      "join_type": "INNER"
+    }
+  ],
+  "grain_status": "clear",
+  "grain_detection": "group_by",
+  "grain_columns": [
+    "orderid"
+  ],
+  "semantic_intent": "semantic_candidate",
+  "semantic_node": "order_aggregates",
+  "grain_scope": "cte",
+  "grain_reasons": []
+}

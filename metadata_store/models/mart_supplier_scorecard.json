@@ -1,0 +1,125 @@
+{
+  "model": "mart_supplier_scorecard",
+  "metrics": [],
+  "dimensions": [],
+  "dimension_details": [],
+  "filters": [
+    "is_deleted = FALSE"
+  ],
+  "source_tables": [
+    "final",
+    "fct_purchase_orders",
+    "stg__purchasing__purchaseorderlines",
+    "dim_suppliers",
+    "dim_stock_items",
+    "purchase_orders",
+    "purchase_order_lines",
+    "stock_items",
+    "mart_product_profitability",
+    "supplier_purchase_metrics",
+    "suppliers",
+    "supplier_sales_performance",
+    "supplier_scorecard",
+    "ranked_suppliers"
+  ],
+  "entity": {
+    "name": "mart_supplier_scorecard",
+    "pk": null,
+    "columns": []
+  },
+  "relationships": [
+    {
+      "parent_model": "fct_purchase_orders",
+      "child_model": "mart_supplier_scorecard",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "stg__purchasing__purchaseorderlines",
+      "child_model": "mart_supplier_scorecard",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "dim_suppliers",
+      "child_model": "mart_supplier_scorecard",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "dim_stock_items",
+      "child_model": "mart_supplier_scorecard",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "mart_product_profitability",
+      "child_model": "mart_supplier_scorecard",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "purchase_order_lines",
+      "child_model": "purchase_orders",
+      "fk_column": "purchase_order_id",
+      "pk_column": "purchaseorderid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "purchase_order_lines",
+      "child_model": "mart_supplier_scorecard",
+      "fk_column": "purchase_order_id",
+      "pk_column": "purchaseorderid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "mart_product_profitability",
+      "child_model": "stock_items",
+      "fk_column": "stock_item_id",
+      "pk_column": "stock_item_id",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "suppliers",
+      "child_model": "supplier_purchase_metrics",
+      "fk_column": "supplier_id",
+      "pk_column": "supplier_id",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "suppliers",
+      "child_model": "mart_supplier_scorecard",
+      "fk_column": "supplier_id",
+      "pk_column": "supplier_id",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "supplier_sales_performance",
+      "child_model": "suppliers",
+      "fk_column": "supplier_name",
+      "pk_column": "supplier_name",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "supplier_sales_performance",
+      "child_model": "mart_supplier_scorecard",
+      "fk_column": "supplier_name",
+      "pk_column": "supplier_name",
+      "join_type": "INNER"
+    }
+  ],
+  "grain_status": "ambiguous",
+  "grain_detection": "none",
+  "grain_columns": [],
+  "semantic_intent": "aggregation_like",
+  "semantic_node": "unknown",
+  "grain_scope": "cte",
+  "grain_reasons": [
+    "multiple grouped CTE sources detected without regrouping"
+  ]
+}

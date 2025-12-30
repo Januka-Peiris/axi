@@ -3,10 +3,18 @@
 # Change Date: 2027-01-01. Change License: MIT.
 
 from fastapi import APIRouter, HTTPException
-from typing import List
+from typing import List, Optional
+from pydantic import BaseModel
 from axi.config.settings import get_settings
 from axi.glossary.glossary_store import GlossaryStore
 from axi.glossary.glossary_models import GlossaryEntity, GlossaryMetric, GlossaryDimension
+from axi.glossary.term_store import GlossaryTermStore
+from axi.glossary.term_models import GlossaryTerm
+from axi.glossary.alignment_assistant import align_candidate
+from axi.glossary.drift_detector import detect_drift
+from axi.glossary.candidate_nudges import suggest_candidates
+from axi.glossary.explanation import explain_subject
+from axi.glossary.impact_analysis import run_impact_analysis
 from axi.utils.logging_config import get_logger
 from axi.exceptions import MetadataError, ValidationError
 
@@ -137,3 +145,146 @@ def generate_glossary():
     except Exception as e:
         logger.error(f"Unexpected error generating glossary: {e}")
         raise HTTPException(status_code=500, detail=MetadataError(f"Failed to generate glossary: {e}", code="GLOSSARY_GENERATION_ERROR").to_dict())
+
+
+# --- Glossary Terms (versioned) ---
+
+@router.get("/terms", response_model=List[GlossaryTerm])
+def list_terms(linked_entity: Optional[str] = None, linked_metric: Optional[str] = None):
+    store = GlossaryTermStore()
+    try:
+        return store.list_terms(linked_entity=linked_entity, linked_metric=linked_metric)
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+
+@router.get("/terms/{term}", response_model=GlossaryTerm)
+def get_term(term: str):
+    store = GlossaryTermStore()
+    res = store.get_term(term)
+    if not res:
+        raise HTTPException(status_code=404, detail="Term not found")
+    return res
+
+class GlossaryTermCreate(GlossaryTerm):
+    class Config:
+        extra = "ignore"
+
+@router.post("/terms", response_model=GlossaryTerm)
+def create_term(body: GlossaryTermCreate):
+    store = GlossaryTermStore()
+    try:
+        return store.create_term(
+            term=body.term,
+            definition=body.definition,
+            status=body.status,
+            derived_from=body.derived_from,
+            applies_to_entities=body.applies_to_entities,
+            synonyms=body.synonyms,
+            scope=body.scope,
+            notes=body.notes,
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+
+@router.put("/terms/{term}", response_model=GlossaryTerm)
+def edit_term(term: str, body: GlossaryTermCreate):
+    store = GlossaryTermStore()
+    try:
+        return store.edit_term(
+            term=term,
+            definition=body.definition,
+            status=body.status,
+            derived_from=body.derived_from,
+            applies_to_entities=body.applies_to_entities,
+            synonyms=body.synonyms,
+            scope=body.scope,
+            notes=body.notes,
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+
+@router.post("/terms/{term}/deprecate", response_model=GlossaryTerm)
+def deprecate_term(term: str):
+    store = GlossaryTermStore()
+    try:
+        return store.deprecate_term(term)
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+
+
+# --- Glossary Alignment Assistant (advisory only) ---
+
+class GlossaryAlignRequest(BaseModel):
+    candidate_name: str
+    label: Optional[str] = None
+
+class GlossaryAlignResponse(BaseModel):
+    result: str
+    confidence: float
+    explanation: str
+
+@router.post("/align", response_model=GlossaryAlignResponse)
+def align_glossary_term(req: GlossaryAlignRequest):
+    """
+    Advisory alignment suggestion for a candidate promoted item.
+    Returns match | possible_duplicate | no_match | conflict plus explanation.
+    """
+    if not req.candidate_name:
+        raise HTTPException(status_code=400, detail="candidate_name is required")
+    try:
+        return align_candidate(req.candidate_name, req.label)
+    except Exception as e:
+        logger.error(f"Glossary alignment error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to run glossary alignment")
+
+
+@router.get("/drift")
+def glossary_drift(term: Optional[str] = None):
+    """
+    Advisory semantic drift/conflict findings for approved glossary terms.
+    """
+    try:
+        return detect_drift(term_name=term)
+    except Exception as e:
+        logger.error(f"Glossary drift detection error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to run drift detection")
+
+
+@router.get("/suggest")
+def glossary_suggest(item: Optional[str] = None):
+    """
+    Advisory suggestions for promoted items that may warrant a glossary entry.
+    """
+    try:
+        return suggest_candidates(item_name=item)
+    except Exception as e:
+        logger.error(f"Glossary suggestion error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to run glossary suggestions")
+
+
+@router.get("/explain")
+def glossary_explain(subject: str, subject_type: str = "metric"):
+    """
+    Explain a metric/entity using approved glossary language only.
+    """
+    if not subject:
+        raise HTTPException(status_code=400, detail="subject is required")
+    try:
+        return explain_subject(subject, subject_type)
+    except Exception as e:
+        logger.error(f"Glossary explanation error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate explanation")
+
+
+@router.get("/impact")
+def glossary_impact(subject: str, change_type: str = "glossary_edit"):
+    """
+    Advisory impact awareness for glossary or semantic changes.
+    """
+    if not subject:
+        raise HTTPException(status_code=400, detail="subject is required")
+    try:
+        return run_impact_analysis(change_type=change_type, subject=subject)
+    except Exception as e:
+        logger.error(f"Glossary impact error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to run impact analysis")

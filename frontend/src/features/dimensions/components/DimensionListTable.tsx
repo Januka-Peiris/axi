@@ -12,6 +12,21 @@ interface DimensionListTableProps {
 type SortField = 'dimension_name' | 'entity_name' | 'cardinality';
 type SortDirection = 'asc' | 'desc';
 
+const SortIcon: React.FC<{ field: SortField; activeField: SortField; direction: SortDirection }> = ({
+  field,
+  activeField,
+  direction,
+}) => {
+  if (activeField !== field) {
+    return <ArrowUpDown className="w-3 h-3 text-slate-500" />;
+  }
+  return direction === 'asc' ? (
+    <ArrowUp className="w-3 h-3 text-cyan-400" />
+  ) : (
+    <ArrowDown className="w-3 h-3 text-cyan-400" />
+  );
+};
+
 export const DimensionListTable: React.FC<DimensionListTableProps> = ({
   dimensions,
   isLoading = false,
@@ -32,7 +47,7 @@ export const DimensionListTable: React.FC<DimensionListTableProps> = ({
 
   // Filter and sort dimensions
   const filteredAndSorted = useMemo(() => {
-    let filtered = dimensions.filter((d) => {
+    const filtered = dimensions.filter((d) => {
       const matchesSearch =
         d.dimension_name.toLowerCase().includes(search.toLowerCase()) ||
         (d.entity_name?.toLowerCase().includes(search.toLowerCase()) ?? false);
@@ -40,8 +55,7 @@ export const DimensionListTable: React.FC<DimensionListTableProps> = ({
       return matchesSearch && matchesEntity;
     });
 
-    // Sort
-    filtered.sort((a, b) => {
+    const sorted = [...filtered].sort((a, b) => {
       let aVal: string | number;
       let bVal: string | number;
 
@@ -71,7 +85,7 @@ export const DimensionListTable: React.FC<DimensionListTableProps> = ({
       }
     });
 
-    return filtered;
+    return sorted;
   }, [dimensions, search, entityFilter, sortField, sortDirection]);
 
   const handleSort = (field: SortField) => {
@@ -81,17 +95,6 @@ export const DimensionListTable: React.FC<DimensionListTableProps> = ({
       setSortField(field);
       setSortDirection('asc');
     }
-  };
-
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) {
-      return <ArrowUpDown className="w-3 h-3 text-slate-500" />;
-    }
-    return sortDirection === 'asc' ? (
-      <ArrowUp className="w-3 h-3 text-cyan-400" />
-    ) : (
-      <ArrowDown className="w-3 h-3 text-cyan-400" />
-    );
   };
 
   if (isLoading) {
@@ -142,7 +145,7 @@ export const DimensionListTable: React.FC<DimensionListTableProps> = ({
                   className="flex items-center gap-2 hover:text-white transition-colors"
                 >
                   Dimension Name
-                  <SortIcon field="dimension_name" />
+                  <SortIcon field="dimension_name" activeField={sortField} direction={sortDirection} />
                 </button>
               </th>
               <th className="p-4 font-semibold text-slate-300 w-[180px] min-w-[120px]">
@@ -151,7 +154,7 @@ export const DimensionListTable: React.FC<DimensionListTableProps> = ({
                   className="flex items-center gap-2 hover:text-white transition-colors"
                 >
                   Entity Name
-                  <SortIcon field="entity_name" />
+                  <SortIcon field="entity_name" activeField={sortField} direction={sortDirection} />
                 </button>
               </th>
               <th className="p-4 font-semibold text-slate-300 w-[120px] min-w-[100px]">Data Type</th>
@@ -161,7 +164,7 @@ export const DimensionListTable: React.FC<DimensionListTableProps> = ({
                   className="flex items-center gap-2 hover:text-white transition-colors"
                 >
                   Cardinality
-                  <SortIcon field="cardinality" />
+                  <SortIcon field="cardinality" activeField={sortField} direction={sortDirection} />
                 </button>
               </th>
               <th className="p-4 font-semibold text-slate-300 w-[100px] min-w-[80px]">Primary Key</th>

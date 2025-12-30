@@ -86,7 +86,7 @@ export const LiveQueryPreview = ({
         }, 500);
 
         return () => clearTimeout(debounceTimer);
-    }, [metrics, dimensions, filters, limit]);
+    }, [metrics, dimensions, filters, limit, executeQuery]);
 
     // Auto-refresh interval
     useEffect(() => {

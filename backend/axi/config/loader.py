@@ -44,22 +44,54 @@ class DimensionsConfig(BaseModel):
     drop: List[str] = Field(default_factory=list)
 
 class SnowflakeConfig(BaseModel):
-    """Snowflake connection configuration."""
-    
+    """
+    Snowflake connection configuration.
+
+    Supports multiple authentication methods:
+    - Password: username + password
+    - Key Pair: username + private_key_path + private_key_passphrase
+    - SSO: username + authenticator='externalbrowser'
+    - OAuth: username + token
+    """
+
     model_config = ConfigDict(protected_namespaces=(), populate_by_name=True)
-    
+
     account: Optional[str] = Field(
         default=None,
-        description="Snowflake account identifier"
+        description="Snowflake account identifier (e.g., 'xy12345.us-east-1')"
     )
     user: Optional[str] = Field(
         default=None,
         description="Snowflake username"
     )
+
+    # Password authentication
     password: Optional[SecretStr] = Field(
         default=None,
-        description="Snowflake password (sensitive)"
+        description="Snowflake password (sensitive). Use for password-based auth."
     )
+
+    # Key-pair authentication
+    private_key_path: Optional[str] = Field(
+        default=None,
+        description="Path to private key file (.pem) for key-pair authentication"
+    )
+    private_key_passphrase: Optional[SecretStr] = Field(
+        default=None,
+        description="Passphrase for encrypted private key (if applicable)"
+    )
+
+    # SSO/OAuth authentication
+    authenticator: Optional[str] = Field(
+        default=None,
+        description="Authentication method: 'externalbrowser' (SSO), 'oauth', 'snowflake' (default), or 'https://<okta_account>.okta.com' (Okta)"
+    )
+    token: Optional[SecretStr] = Field(
+        default=None,
+        description="OAuth token for OAuth authentication"
+    )
+
+    # Connection settings
     role: Optional[str] = Field(
         default=None,
         description="Snowflake role"
@@ -78,16 +110,43 @@ class SnowflakeConfig(BaseModel):
         description="Snowflake schema"
     )
 
+    # Advanced connection options
+    client_session_keep_alive: bool = Field(
+        default=True,
+        description="Keep session alive to prevent timeouts on long-running operations"
+    )
+    network_timeout: Optional[int] = Field(
+        default=None,
+        description="Network timeout in seconds (default: None = use connector default)"
+    )
+    login_timeout: Optional[int] = Field(
+        default=60,
+        description="Login timeout in seconds"
+    )
+
     @field_validator('account', 'user', 'warehouse', 'database', 'schema_name')
     @classmethod
     def validate_identifier(cls, v: Optional[str]) -> Optional[str]:
         """Validate Snowflake identifier format."""
         if v:
-            # Basic validation: no special characters that would break connection string
-            if not re.match(r'^[a-zA-Z0-9_$]+$', v):
+            # Allow dots in account identifier (e.g., xy12345.us-east-1)
+            # but still validate for SQL injection
+            if not re.match(r'^[a-zA-Z0-9_.$-]+$', v):
                 raise ValueError(f"Invalid Snowflake identifier: {v}")
         return v
-    
+
+    @field_validator('private_key_path')
+    @classmethod
+    def validate_private_key_path(cls, v: Optional[str]) -> Optional[str]:
+        """Validate that private key file exists if provided."""
+        if v:
+            path = Path(v).expanduser()
+            if not path.exists():
+                raise ValueError(f"Private key file does not exist: {v}")
+            if not path.is_file():
+                raise ValueError(f"Private key path is not a file: {v}")
+        return v
+
     @property
     def schema(self) -> Optional[str]:
         """Get schema name."""
@@ -97,16 +156,48 @@ class SnowflakeConfig(BaseModel):
     def schema(self, value: Optional[str]):
         """Set schema name."""
         self.schema_name = value
-    
+
     def get_password(self) -> Optional[str]:
         """Get password as string (for backward compatibility)."""
         if self.password:
             return self.password.get_secret_value()
         return None
 
+    def get_private_key_passphrase(self) -> Optional[str]:
+        """Get private key passphrase as string."""
+        if self.private_key_passphrase:
+            return self.private_key_passphrase.get_secret_value()
+        return None
+
+    def get_token(self) -> Optional[str]:
+        """Get OAuth token as string."""
+        if self.token:
+            return self.token.get_secret_value()
+        return None
+
+    def get_auth_method(self) -> str:
+        """
+        Determine which authentication method is configured.
+
+        Returns:
+            'key_pair', 'oauth', 'sso', 'password', or 'none'
+        """
+        if self.private_key_path:
+            return 'key_pair'
+        elif self.token:
+            return 'oauth'
+        elif self.authenticator == 'externalbrowser':
+            return 'sso'
+        elif self.password:
+            return 'password'
+        else:
+            return 'none'
+
 class DatabaseConfig(BaseModel):
     """Database configuration for metadata storage."""
-    
+
+    model_config = ConfigDict(populate_by_name=True)
+
     db_type: Literal["sqlite", "postgres"] = Field(
         default="sqlite",
         description="Database type: sqlite (embedded) or postgres (server)"
@@ -135,13 +226,19 @@ class DatabaseConfig(BaseModel):
     )
     db_password: Optional[SecretStr] = Field(
         default=None,
+        alias="password",
         description="Database password (for PostgreSQL, supports env: syntax)"
     )
-    
+    db_schema: Optional[str] = Field(
+        default=None,
+        alias="schema",
+        description="PostgreSQL schema for multi-tenancy (creates if not exists)"
+    )
+
     def get_password(self) -> Optional[str]:
         """Get password as string (for backward compatibility)."""
-        if self.password:
-            return self.password.get_secret_value()
+        if self.db_password:
+            return self.db_password.get_secret_value()
         return None
 
 class Config(BaseModel):

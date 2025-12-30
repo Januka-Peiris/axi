@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { History, GitCommit, ChevronDown, ChevronRight, RotateCcw, Diff } from 'lucide-react';
+import { History, GitCommit, ChevronDown, ChevronRight, RotateCcw } from 'lucide-react';
 
 interface VersionEntry {
     id: string;
@@ -33,7 +33,26 @@ export const VersionHistory = ({
 }: VersionHistoryProps) => {
     const [versions, setVersions] = useState<VersionEntry[]>([]);
     const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
-    const [comparing, setComparing] = useState<string | null>(null);
+
+    const detectChanges = (oldData: Record<string, any>, newData: Record<string, any>) => {
+        const changes: VersionEntry['changes'] = [];
+        const allKeys = new Set([...Object.keys(oldData), ...Object.keys(newData)]);
+
+        allKeys.forEach(key => {
+            const oldVal = oldData[key];
+            const newVal = newData[key];
+
+            if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+                changes.push({
+                    field: key,
+                    oldValue: oldVal,
+                    newValue: newVal
+                });
+            }
+        });
+
+        return changes;
+    };
 
     // Load versions from local storage
     useEffect(() => {
@@ -92,26 +111,6 @@ export const VersionHistory = ({
         localStorage.setItem(key, JSON.stringify(newVersions));
         setVersions(newVersions);
     }, [currentData, entityType, entityId]);
-
-    const detectChanges = (oldData: Record<string, any>, newData: Record<string, any>) => {
-        const changes: VersionEntry['changes'] = [];
-        const allKeys = new Set([...Object.keys(oldData), ...Object.keys(newData)]);
-
-        allKeys.forEach(key => {
-            const oldVal = oldData[key];
-            const newVal = newData[key];
-
-            if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
-                changes.push({
-                    field: key,
-                    oldValue: oldVal,
-                    newValue: newVal
-                });
-            }
-        });
-
-        return changes;
-    };
 
     const formatDate = (date: Date) => {
         return date.toLocaleString(undefined, {

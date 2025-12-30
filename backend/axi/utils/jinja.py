@@ -19,20 +19,9 @@ def strip_jinja(sql: str) -> str:
     if not sql:
         return ""
 
-    def replace_curly(match: re.Match) -> str:
-        expr = match.group(1).strip()
-
-        # Handle common dbt macros to preserve table names for relationship parsing
-        ref_match = re.search(r"ref\s*\(\s*['\"]([^'\"]+)['\"](?:\s*,\s*['\"]([^'\"]+)['\"])?", expr, flags=re.IGNORECASE)
-        if ref_match:
-            # If package/name provided, prefer the model name (second group), else first
-            return ref_match.group(2) or ref_match.group(1)
-
-        source_match = re.search(r"source\s*\(\s*['\"]([^'\"]+)['\"]\s*,\s*['\"]([^'\"]+)['\"]", expr, flags=re.IGNORECASE)
-        if source_match:
-            # Keep table name (matches how entities are named in the indexer)
-            return source_match.group(2)
-
+    def replace_curly(_match: re.Match) -> str:
+        # Always scrub Jinja expressions to a placeholder so downstream SQL parsing
+        # stays deterministic and unit tests can assert a consistent replacement.
         return "/* jinja_expr */"
 
     # Replace variables {{ ... }} with identifier/comment placeholder

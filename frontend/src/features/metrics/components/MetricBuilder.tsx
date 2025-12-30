@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, X, Save, AlertCircle } from 'lucide-react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState, useEffect, useMemo, useDeferredValue } from 'react';
+import { Plus, X, Save, AlertCircle, Link2, Loader2 } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../../api/client';
 
 interface MetricBuilderProps {
@@ -24,8 +24,19 @@ interface Entity {
   model?: string;
 }
 
+interface VisibleDimension {
+  name: string;
+  entity: string;
+  model?: string;
+  hops: number;
+  via: string[];
+  via_description?: string;
+  relationship_type: 'direct' | 'explicit' | 'inferred';
+  join_keys: any[];
+  grain_relation: string;
+}
+
 export const MetricBuilder: React.FC<MetricBuilderProps> = ({ onClose, onSuccess, isOpen = true, initialData }) => {
-  if (!isOpen) return null;
   const [metricName, setMetricName] = useState(initialData?.metric || '');
   const [description, setDescription] = useState(initialData?.description || '');
   const [entity, setEntity] = useState(initialData?.entity || '');
@@ -38,7 +49,6 @@ export const MetricBuilder: React.FC<MetricBuilderProps> = ({ onClose, onSuccess
   const [newGrainDim, setNewGrainDim] = useState('');
   const [newDimension, setNewDimension] = useState('');
   const [availableEntities, setAvailableEntities] = useState<Entity[]>([]);
-  const [availableDimensions, setAvailableDimensions] = useState<string[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
 
   const queryClient = useQueryClient();
@@ -55,22 +65,64 @@ export const MetricBuilder: React.FC<MetricBuilderProps> = ({ onClose, onSuccess
       });
   }, []);
 
-  // Load dimensions when entity changes
-  useEffect(() => {
-    if (entity) {
-      // Get dimensions for this entity's model
-      api.get('/api/dimensions')
-        .then(res => {
-          const entityDims = (res.data || [])
-            .filter((d: any) => d.entity_name === entity)
-            .map((d: any) => d.dimension_name || d.name);
-          setAvailableDimensions(entityDims);
-        })
-        .catch(err => console.error('Failed to load dimensions:', err));
-    } else {
-      setAvailableDimensions([]);
-    }
-  }, [entity]);
+  // Load joinable dimensions using reachability API
+  const { data: contextData, isLoading: contextLoading } = useQuery({
+    queryKey: ['metric-context', entity],
+    queryFn: async () => {
+      if (!entity) return null;
+      const res = await api.post('/api/query/sqlrunner/context', {
+        metrics: [],
+        entities: [entity],
+        dimensions: []
+      });
+      return res.data;
+    },
+    enabled: !!entity
+  });
+
+  // Split dimensions into direct and joinable
+  const directDimensions = useMemo(() =>
+    (contextData?.visible_dimensions || []).filter((d: VisibleDimension) => d.hops === 0),
+    [contextData]
+  );
+
+  const joinableDimensions = useMemo(() =>
+    (contextData?.visible_dimensions || []).filter((d: VisibleDimension) => d.hops > 0),
+    [contextData]
+  );
+
+  const allDimensions = useMemo(() =>
+    (contextData?.visible_dimensions || []) as VisibleDimension[],
+    [contextData]
+  );
+
+  // Debounce inputs to reduce API calls (improves performance and reduces server load)
+  const deferredExpression = useDeferredValue(expression);
+  const deferredDimensions = useDeferredValue(dimensions);
+  const deferredGrain = useDeferredValue(grain);
+
+  // Load join plan preview with error handling and loading states
+  const {
+    data: joinPlan,
+    isLoading: joinPlanLoading,
+    error: joinPlanError
+  } = useQuery({
+    queryKey: ['join-plan', entity, deferredExpression, deferredDimensions, deferredGrain],
+    queryFn: async () => {
+      if (!entity) return null;
+      if (!deferredExpression && deferredDimensions.length === 0 && deferredGrain.length === 0) return null;
+
+      const res = await api.post('/api/metrics/preview-join-plan', {
+        entity,
+        expression: deferredExpression || '',
+        dimensions: [...new Set([...deferredDimensions, ...deferredGrain])] // Combine and dedupe
+      });
+      return res.data;
+    },
+    enabled: !!entity && (!!deferredExpression || deferredDimensions.length > 0 || deferredGrain.length > 0),
+    retry: 1, // Only retry once to avoid excessive API calls
+    staleTime: 1000 // Cache for 1 second to reduce redundant calls
+  });
 
   const createMutation = useMutation({
     mutationFn: (data: any) => api.post('/api/metrics', data),
@@ -181,6 +233,8 @@ export const MetricBuilder: React.FC<MetricBuilderProps> = ({ onClose, onSuccess
     setDimensions(dimensions.filter(d => d !== dim));
   };
 
+  if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-panel border border-border rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -259,10 +313,10 @@ export const MetricBuilder: React.FC<MetricBuilderProps> = ({ onClose, onSuccess
                 onChange={(e) => setExpression(e.target.value)}
                 className="w-full px-3 py-2 bg-background border border-border rounded-lg font-mono text-sm"
                 required
-                placeholder="SUM(amount)"
+                placeholder="SUM(amount) or {other_metric} / {total}"
               />
               <p className="text-xs text-text-secondary mt-1">
-                Must contain exactly one aggregation (SUM, COUNT, AVG, MIN, MAX)
+                Must contain exactly one aggregation (SUM, COUNT, AVG, MIN, MAX) or reference other metrics using {"{metric_name}"}
               </p>
             </div>
 
@@ -294,11 +348,25 @@ export const MetricBuilder: React.FC<MetricBuilderProps> = ({ onClose, onSuccess
                   value={newGrainDim}
                   onChange={(e) => setNewGrainDim(e.target.value)}
                   className="flex-1 px-3 py-2 bg-background border border-border rounded-lg"
+                  disabled={contextLoading}
                 >
-                  <option value="">Select dimension...</option>
-                  {availableDimensions.map(dim => (
-                    <option key={dim} value={dim}>{dim}</option>
-                  ))}
+                  <option value="">{contextLoading ? 'Loading dimensions...' : 'Select dimension...'}</option>
+                  {directDimensions.length > 0 && (
+                    <optgroup label="Direct">
+                      {directDimensions.map((dim: VisibleDimension) => (
+                        <option key={dim.name} value={dim.name}>{dim.name}</option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {joinableDimensions.length > 0 && (
+                    <optgroup label="Joinable (requires JOIN)">
+                      {joinableDimensions.map((dim: VisibleDimension) => (
+                        <option key={dim.name} value={dim.name}>
+                          {dim.name} ({dim.hops} hop{dim.hops > 1 ? 's' : ''} via {dim.entity})
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
                 <button
                   type="button"
@@ -334,11 +402,25 @@ export const MetricBuilder: React.FC<MetricBuilderProps> = ({ onClose, onSuccess
                   value={newDimension}
                   onChange={(e) => setNewDimension(e.target.value)}
                   className="flex-1 px-3 py-2 bg-background border border-border rounded-lg"
+                  disabled={contextLoading}
                 >
-                  <option value="">Select dimension...</option>
-                  {availableDimensions.map(dim => (
-                    <option key={dim} value={dim}>{dim}</option>
-                  ))}
+                  <option value="">{contextLoading ? 'Loading dimensions...' : 'Select dimension...'}</option>
+                  {directDimensions.length > 0 && (
+                    <optgroup label="Direct">
+                      {directDimensions.map((dim: VisibleDimension) => (
+                        <option key={dim.name} value={dim.name}>{dim.name}</option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {joinableDimensions.length > 0 && (
+                    <optgroup label="Joinable (requires JOIN)">
+                      {joinableDimensions.map((dim: VisibleDimension) => (
+                        <option key={dim.name} value={dim.name}>
+                          {dim.name} ({dim.hops} hop{dim.hops > 1 ? 's' : ''} via {dim.entity})
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
                 <button
                   type="button"
@@ -405,6 +487,71 @@ export const MetricBuilder: React.FC<MetricBuilderProps> = ({ onClose, onSuccess
               </div>
             </div>
 
+            {/* Join Plan Preview - Loading State */}
+            {joinPlanLoading && entity && (deferredExpression || deferredDimensions.length > 0 || deferredGrain.length > 0) && (
+              <div className="mt-4 p-3 bg-slate-500/5 border border-slate-500/20 rounded-lg">
+                <div className="flex items-center gap-2 text-slate-400 text-xs">
+                  <Loader2 size={14} className="animate-spin" />
+                  Analyzing required joins...
+                </div>
+              </div>
+            )}
+
+            {/* Join Plan Preview - Error State */}
+            {joinPlanError && !joinPlanLoading && (
+              <div className="mt-4 p-3 bg-yellow-500/5 border border-yellow-500/20 rounded-lg">
+                <div className="flex items-center gap-2 text-yellow-400 text-xs">
+                  <AlertCircle size={14} />
+                  <span>Unable to preview joins. You can still save the metric.</span>
+                </div>
+              </div>
+            )}
+
+            {/* Join Plan Preview - Success State */}
+            {joinPlan && joinPlan.join_paths && Object.keys(joinPlan.join_paths).length > 0 && !joinPlanLoading && (
+              <div className="mt-4 p-3 bg-cyan-500/5 border border-cyan-500/20 rounded-lg">
+                <div className="flex items-center gap-2 text-cyan-400 text-sm font-medium mb-2">
+                  <Link2 size={16} />
+                  Automatic JOINs Required
+                </div>
+                <div className="text-xs text-slate-300 space-y-1">
+                  {Object.entries(joinPlan.join_paths).map(([entity, path]: [string, any]) => (
+                    <div key={entity} className="flex items-start gap-2">
+                      <span className="text-slate-500">→</span>
+                      <span>
+                        <span className="text-slate-400">{joinPlan.base_entity}</span>
+                        {' → '}
+                        <span className="text-cyan-400">{entity}</span>
+                        <span className="text-slate-500 ml-2">
+                          ({path.length} hop{path.length > 1 ? 's' : ''})
+                        </span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {joinPlan.metric_references && joinPlan.metric_references.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-cyan-500/10">
+                    <div className="text-xs text-slate-400">
+                      References metrics: {joinPlan.metric_references.map((ref: string) => `{${ref}}`).join(', ')}
+                    </div>
+                  </div>
+                )}
+                {joinPlan.warnings && joinPlan.warnings.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-yellow-500/20">
+                    <div className="flex items-center gap-1 text-yellow-400 text-xs">
+                      <AlertCircle size={12} />
+                      <span>Warnings:</span>
+                    </div>
+                    <div className="text-xs text-yellow-300/80 mt-1 space-y-1">
+                      {joinPlan.warnings.map((warning: string, idx: number) => (
+                        <div key={idx}>• {warning}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="flex gap-3 pt-4">
               <button
                 type="submit"
@@ -428,4 +575,3 @@ export const MetricBuilder: React.FC<MetricBuilderProps> = ({ onClose, onSuccess
     </div>
   );
 };
-

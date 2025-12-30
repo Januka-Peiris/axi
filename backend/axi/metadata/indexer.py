@@ -40,7 +40,7 @@ class MetadataIndexer:
     def _create_db_adapter(self) -> DatabaseAdapter:
         """Create database adapter based on configuration."""
         settings = get_settings()
-        
+
         # Try project config first, then fall back to settings
         try:
             config = load_config()
@@ -53,11 +53,12 @@ class MetadataIndexer:
                     db_port=db_config.db_port,
                     db_name=db_config.db_name,
                     db_user=db_config.db_user,
-                    db_password=db_config.get_password()
+                    db_password=db_config.get_password(),
+                    db_schema=db_config.db_schema
                 )
         except Exception:
             pass
-        
+
         # Fall back to settings or default SQLite
         if settings.db_type == "postgres":
             return create_database_adapter(
@@ -67,7 +68,8 @@ class MetadataIndexer:
                 db_port=settings.db_port,
                 db_name=settings.db_name,
                 db_user=settings.db_user,
-                db_password=settings.db_password
+                db_password=settings.db_password,
+                db_schema=getattr(settings, 'db_schema', None)
             )
         else:
             # Default to SQLite
@@ -120,7 +122,8 @@ class MetadataIndexer:
             semi_additive_dimension TEXT,
             tags TEXT,
             description TEXT,
-            entity_name TEXT
+            entity_name TEXT,
+            dimension_entity_map TEXT
         )''')
         
         # Ensure column exists (migration) - SQLite specific
@@ -130,6 +133,8 @@ class MetadataIndexer:
                 m_cols = [row[1] for row in result] if result else []
                 if 'entity_name' not in m_cols:
                     self.db.execute("ALTER TABLE metrics ADD COLUMN entity_name TEXT")
+                if 'dimension_entity_map' not in m_cols:
+                    self.db.execute("ALTER TABLE metrics ADD COLUMN dimension_entity_map TEXT")
             except Exception:
                 pass
         
@@ -511,10 +516,12 @@ class MetadataIndexer:
                 tags = metric_data.get("tags", [])
                 desc = metric_data.get("description", "")
                 m_type = metric_data.get("type", "custom")
-                
+                depends_on = metric_data.get("depends_on", [])
+                dimension_entity_map = metric_data.get("dimension_entity_map", {})
+
                 # Get entity's model name from pre-loaded map
                 model_name = entity_model_map.get(entity_name) if entity_name else None
-                
+
                 # Insert or replace metric - use adapter's serialize_json for consistency
                 self.db.insert_or_replace('metrics', {
                     'name': m_name,
@@ -529,14 +536,15 @@ class MetadataIndexer:
                     'default_dimensions': self.db.serialize_json(dims),
                     'default_filter': "",
                     'time_dimension': "",
-                    'depends_on': self.db.serialize_json([]),
+                    'depends_on': self.db.serialize_json(depends_on),
                     'numerator': "",
                     'denominator': "",
                     'semi_additive_method': "",
                     'semi_additive_dimension': "",
                     'tags': self.db.serialize_json(tags),
                     'description': desc,
-                    'entity_name': entity_name
+                    'entity_name': entity_name,
+                    'dimension_entity_map': self.db.serialize_json(dimension_entity_map)
                 })
             except Exception as e:
                 # Log error but continue processing other metrics
@@ -876,12 +884,12 @@ class MetadataIndexer:
         cols = ['name', 'expression', 'model', 'grain', 'dimensions', 'filters', 'source_table',
                 'metric_type', 'aggregation', 'default_dimensions', 'default_filter', 'time_dimension',
                 'depends_on', 'numerator', 'denominator', 'semi_additive_method', 'semi_additive_dimension',
-                'tags', 'description', 'entity_name']
+                'tags', 'description', 'entity_name', 'dimension_entity_map']
         result = []
         for row in rows:
             d = dict(zip(cols, row))
             # Deserialize JSON fields
-            for json_field in ['dimensions', 'filters', 'default_dimensions', 'depends_on', 'tags', 'grain']:
+            for json_field in ['dimensions', 'filters', 'default_dimensions', 'depends_on', 'tags', 'grain', 'dimension_entity_map']:
                 if json_field in d:
                     d[json_field] = self.db.deserialize_json(d[json_field])
             result.append(d)
@@ -894,10 +902,10 @@ class MetadataIndexer:
         cols = ['name', 'expression', 'model', 'grain', 'dimensions', 'filters', 'source_table',
                 'metric_type', 'aggregation', 'default_dimensions', 'default_filter', 'time_dimension',
                 'depends_on', 'numerator', 'denominator', 'semi_additive_method', 'semi_additive_dimension',
-                'tags', 'description', 'entity_name']
+                'tags', 'description', 'entity_name', 'dimension_entity_map']
         d = dict(zip(cols, row))
         # Deserialize JSON fields
-        for json_field in ['dimensions', 'filters', 'default_dimensions', 'depends_on', 'tags', 'grain']:
+        for json_field in ['dimensions', 'filters', 'default_dimensions', 'depends_on', 'tags', 'grain', 'dimension_entity_map']:
             if json_field in d:
                 d[json_field] = self.db.deserialize_json(d[json_field])
         return d
@@ -1028,6 +1036,75 @@ class MetadataIndexer:
                 ),
             )
             conn.commit()
+
+    def update_entity_pk(self, entity_name: str, pk_column: str) -> None:
+        """
+        Update an entity's primary key column.
+        Used by Snowflake extractor when it discovers PK constraints.
+        """
+        if not entity_name or not pk_column:
+            return
+        with self._get_conn() as conn:
+            c = conn.cursor()
+            # First check if entity exists
+            c.execute('SELECT primary_key FROM entities WHERE name = ?', (entity_name,))
+            row = c.fetchone()
+            if row:
+                existing_pk = row[0]
+                # If already has a PK, append (composite key) or skip if same
+                if existing_pk:
+                    try:
+                        existing = json.loads(existing_pk) if existing_pk.startswith('[') else [existing_pk]
+                    except (json.JSONDecodeError, TypeError, ValueError):
+                        existing = [existing_pk]
+                    if pk_column not in existing:
+                        existing.append(pk_column)
+                        new_pk = json.dumps(existing)
+                    else:
+                        new_pk = existing_pk
+                else:
+                    new_pk = pk_column
+                c.execute('UPDATE entities SET primary_key = ? WHERE name = ?', (new_pk, entity_name))
+                conn.commit()
+
+    def add_relationship(self, relationship: Dict[str, Any]) -> int:
+        """
+        Add a relationship to the relationships table.
+        Used by Snowflake extractor to create relationships from FK constraints.
+
+        Args:
+            relationship: Dict with keys: parent_model, child_model, fk_column, pk_column, join_type
+
+        Returns:
+            The ID of the inserted relationship
+        """
+        parent = relationship.get("parent_model")
+        child = relationship.get("child_model")
+        fk = relationship.get("fk_column", "")
+        pk = relationship.get("pk_column", "")
+        join_type = relationship.get("join_type", "FK")
+
+        if not parent or not child:
+            return -1
+
+        with self._get_conn() as conn:
+            c = conn.cursor()
+            # Check if relationship already exists
+            c.execute('''
+                SELECT id FROM relationships
+                WHERE parent_model = ? AND child_model = ? AND fk_column = ? AND pk_column = ?
+            ''', (parent, child, fk, pk))
+            existing = c.fetchone()
+            if existing:
+                return existing[0]
+
+            # Insert new relationship
+            c.execute('''
+                INSERT INTO relationships (parent_model, child_model, fk_column, pk_column, join_type)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (parent, child, fk, pk, join_type))
+            conn.commit()
+            return c.lastrowid or -1
 
     # Snowflake Metadata Methods
     def list_sf_tables(self) -> List[Dict[str, Any]]:

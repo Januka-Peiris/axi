@@ -26,7 +26,7 @@ export const GlossarySearchBar: React.FC = () => {
                 <input
                     type="text"
                     className="w-full bg-[#0d0f15] border border-white/10 rounded-lg py-3 pl-10 pr-4 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 transition-all"
-                    placeholder="Search entities, metrics, dimensions..."
+            placeholder="Search business terms and definitions..."
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     onFocus={() => query.length > 1 && setShowResults(true)}

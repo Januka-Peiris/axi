@@ -1,0 +1,392 @@
+{
+  "model": "mart_sales_performance",
+  "metrics": [
+    {
+      "name": "total_orders",
+      "expression": "COUNT(DISTINCT o.order_id)",
+      "model": "mart_sales_performance",
+      "source_table": "mart_sales_performance",
+      "grain": [
+        "salesperson_id",
+        "customer_id",
+        "invoice_date"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_invoices",
+      "expression": "COUNT(DISTINCT i.invoice_id)",
+      "model": "mart_sales_performance",
+      "source_table": "mart_sales_performance",
+      "grain": [
+        "salesperson_id",
+        "customer_id",
+        "invoice_date"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_invoice_lines",
+      "expression": "SUM(i.total_lines)",
+      "model": "mart_sales_performance",
+      "source_table": "mart_sales_performance",
+      "grain": [
+        "salesperson_id",
+        "customer_id",
+        "invoice_date"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_quantity_sold",
+      "expression": "SUM(i.total_quantity)",
+      "model": "mart_sales_performance",
+      "source_table": "mart_sales_performance",
+      "grain": [
+        "salesperson_id",
+        "customer_id",
+        "invoice_date"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_revenue_before_tax",
+      "expression": "SUM(i.total_amount_before_tax)",
+      "model": "mart_sales_performance",
+      "source_table": "mart_sales_performance",
+      "grain": [
+        "salesperson_id",
+        "customer_id",
+        "invoice_date"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_tax_amount",
+      "expression": "SUM(i.total_tax_amount)",
+      "model": "mart_sales_performance",
+      "source_table": "mart_sales_performance",
+      "grain": [
+        "salesperson_id",
+        "customer_id",
+        "invoice_date"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_revenue_including_tax",
+      "expression": "SUM(i.total_amount_including_tax)",
+      "model": "mart_sales_performance",
+      "source_table": "mart_sales_performance",
+      "grain": [
+        "salesperson_id",
+        "customer_id",
+        "invoice_date"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_profit",
+      "expression": "SUM(i.total_profit)",
+      "model": "mart_sales_performance",
+      "source_table": "mart_sales_performance",
+      "grain": [
+        "salesperson_id",
+        "customer_id",
+        "invoice_date"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "profit_margin_percentage",
+      "expression": "CASE WHEN SUM(i.total_amount_before_tax) > 0 THEN (SUM(i.total_profit) / SUM(i.total_amount_before_tax)) * 100 ELSE 0 END",
+      "model": "mart_sales_performance",
+      "source_table": "mart_sales_performance",
+      "grain": [
+        "salesperson_id",
+        "customer_id",
+        "invoice_date"
+      ],
+      "metric_type": "ratio",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "CASE WHEN SUM(i.total_amount_before_tax) > 0 THEN (SUM(i.total_profit)",
+      "denominator": "SUM(i.total_amount_before_tax)) * 100 ELSE 0 END",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "avg_invoice_value",
+      "expression": "AVG(i.total_amount_including_tax)",
+      "model": "mart_sales_performance",
+      "source_table": "mart_sales_performance",
+      "grain": [
+        "salesperson_id",
+        "customer_id",
+        "invoice_date"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "avg",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "avg_quantity_per_invoice",
+      "expression": "AVG(i.total_quantity)",
+      "model": "mart_sales_performance",
+      "source_table": "mart_sales_performance",
+      "grain": [
+        "salesperson_id",
+        "customer_id",
+        "invoice_date"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "avg",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    }
+  ],
+  "dimensions": [
+    "salesperson_id",
+    "customer_id",
+    "invoice_date"
+  ],
+  "dimension_details": [
+    {
+      "name": "salesperson_id",
+      "included": true,
+      "reason": "group_by",
+      "roles": [
+        "grain"
+      ]
+    },
+    {
+      "name": "customer_id",
+      "included": true,
+      "reason": "group_by",
+      "roles": [
+        "grain"
+      ]
+    },
+    {
+      "name": "invoice_date",
+      "included": true,
+      "reason": "group_by",
+      "roles": [
+        "grain"
+      ]
+    }
+  ],
+  "filters": [
+    "is_salesperson = TRUE"
+  ],
+  "source_tables": [
+    "final",
+    "fct_sales_orders",
+    "fct_sales_invoices",
+    "dim_customers",
+    "dim_people",
+    "sales_invoices",
+    "sales_orders",
+    "sales_summary",
+    "salespeople",
+    "customers"
+  ],
+  "entity": {
+    "name": "mart_sales_performance",
+    "pk": null,
+    "columns": []
+  },
+  "relationships": [
+    {
+      "parent_model": "fct_sales_orders",
+      "child_model": "mart_sales_performance",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "fct_sales_invoices",
+      "child_model": "mart_sales_performance",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "dim_customers",
+      "child_model": "mart_sales_performance",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "dim_people",
+      "child_model": "mart_sales_performance",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "sales_orders",
+      "child_model": "sales_invoices",
+      "fk_column": "order_id",
+      "pk_column": "order_id",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "sales_orders",
+      "child_model": "mart_sales_performance",
+      "fk_column": "order_id",
+      "pk_column": "order_id",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "salespeople",
+      "child_model": "sales_summary",
+      "fk_column": "salesperson_id",
+      "pk_column": "person_id",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "salespeople",
+      "child_model": "mart_sales_performance",
+      "fk_column": "salesperson_id",
+      "pk_column": "person_id",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "customers",
+      "child_model": "sales_summary",
+      "fk_column": "customer_id",
+      "pk_column": "customer_id",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "customers",
+      "child_model": "mart_sales_performance",
+      "fk_column": "customer_id",
+      "pk_column": "customer_id",
+      "join_type": "INNER"
+    }
+  ],
+  "grain_status": "clear",
+  "grain_detection": "group_by",
+  "grain_columns": [
+    "salesperson_id",
+    "customer_id",
+    "invoice_date"
+  ],
+  "semantic_intent": "semantic_candidate",
+  "semantic_node": "sales_summary",
+  "grain_scope": "cte",
+  "grain_reasons": []
+}

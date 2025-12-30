@@ -1,7 +1,7 @@
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useGlossaryDimension } from '../../api/glossary';
-import { ArrowLeft, Box, Activity, Layers, Loader2 } from 'lucide-react';
+import { ArrowLeft, Box, Activity, Loader2 } from 'lucide-react';
 import { DimensionTable } from '../../components/glossary/DimensionTable';
 
 export const DimensionView: React.FC = () => {

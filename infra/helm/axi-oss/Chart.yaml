@@ -1,0 +1,22 @@
+apiVersion: v2
+name: axi-oss
+description: AXI OSS - Open Source Semantic Layer and Headless Metrics API
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - metrics
+  - analytics
+  - snowflake
+  - dbt
+  - semantic-layer
+  - open-source
+home: https://github.com/your-org/axi
+maintainers:
+  - name: AXI Team
+    email: team@axi.dev
+dependencies:
+  - name: postgresql
+    version: "13.2.24"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled

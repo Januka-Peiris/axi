@@ -1,0 +1,199 @@
+{
+  "model": "fct_sales_invoices",
+  "metrics": [
+    {
+      "name": "total_lines",
+      "expression": "COUNT(*)",
+      "model": "fct_sales_invoices",
+      "source_table": "fct_sales_invoices",
+      "grain": [
+        "invoiceid"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_quantity",
+      "expression": "SUM(quantity)",
+      "model": "fct_sales_invoices",
+      "source_table": "fct_sales_invoices",
+      "grain": [
+        "invoiceid"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_amount_before_tax",
+      "expression": "SUM(extendedprice)",
+      "model": "fct_sales_invoices",
+      "source_table": "fct_sales_invoices",
+      "grain": [
+        "invoiceid"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_tax_amount",
+      "expression": "SUM(taxamount)",
+      "model": "fct_sales_invoices",
+      "source_table": "fct_sales_invoices",
+      "grain": [
+        "invoiceid"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_amount_including_tax",
+      "expression": "SUM(extendedprice + taxamount)",
+      "model": "fct_sales_invoices",
+      "source_table": "fct_sales_invoices",
+      "grain": [
+        "invoiceid"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_profit",
+      "expression": "SUM(lineprofit)",
+      "model": "fct_sales_invoices",
+      "source_table": "fct_sales_invoices",
+      "grain": [
+        "invoiceid"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    }
+  ],
+  "dimensions": [
+    "invoiceid"
+  ],
+  "dimension_details": [
+    {
+      "name": "invoiceid",
+      "included": true,
+      "reason": "group_by",
+      "roles": [
+        "grain"
+      ]
+    }
+  ],
+  "filters": [
+    "i._fivetran_deleted = FALSE"
+  ],
+  "source_tables": [
+    "final",
+    "stg__sales__invoices",
+    "stg__sales__invoicelines",
+    "invoice_lines",
+    "invoices_base",
+    "invoice_aggregates"
+  ],
+  "entity": {
+    "name": "fct_sales_invoices",
+    "pk": "invoiceid",
+    "columns": []
+  },
+  "relationships": [
+    {
+      "parent_model": "stg__sales__invoices",
+      "child_model": "fct_sales_invoices",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "stg__sales__invoicelines",
+      "child_model": "fct_sales_invoices",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "invoice_aggregates",
+      "child_model": "invoices_base",
+      "fk_column": "invoiceid",
+      "pk_column": "invoiceid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "invoice_aggregates",
+      "child_model": "fct_sales_invoices",
+      "fk_column": "invoiceid",
+      "pk_column": "invoiceid",
+      "join_type": "INNER"
+    }
+  ],
+  "grain_status": "clear",
+  "grain_detection": "group_by",
+  "grain_columns": [
+    "invoiceid"
+  ],
+  "semantic_intent": "semantic_candidate",
+  "semantic_node": "invoice_aggregates",
+  "grain_scope": "cte",
+  "grain_reasons": []
+}

@@ -27,13 +27,9 @@ services:
       - ../examples/demo:/app/demo
     environment:
       - AXI_METADATA_DIR=/app/demo
-      # Uncomment to use PostgreSQL instead of SQLite:
-      # - AXI_DB_TYPE=postgres
-      # - AXI_DB_HOST=postgres
-      # - AXI_DB_PORT=5432
-      # - AXI_DB_NAME=axi
-      # - AXI_DB_USER=axi
-      # - AXI_DB_PASSWORD=axi_dev_password
+      # Set AXI_STORAGE=postgres to opt into Postgres; SQLite remains default.
+      # - AXI_STORAGE=postgres
+      # - DATABASE_URL=postgres://axi:axi_dev_password@postgres:5432/axi
     depends_on:
       postgres:
         condition: service_healthy

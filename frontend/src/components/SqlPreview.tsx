@@ -20,7 +20,7 @@ export const SqlPreview: React.FC<SqlPreviewProps> = ({ metric, dimensions, user
                 }
             });
         }
-    }, [metric, dimensions]);
+    }, [metric, dimensions, onSqlChange]);
 
     return (
         <div className="card" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>

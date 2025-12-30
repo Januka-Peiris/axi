@@ -4,6 +4,7 @@
 
 import yaml
 import os
+import re
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 
@@ -44,7 +45,28 @@ class MetricStore:
         # Sanitize metric name for filename
         safe_name = metric_name.replace("/", "_").replace("\\", "_")
         return os.path.join(self.metrics_dir, f"{safe_name}.yml")
-    
+
+    def _extract_metric_references(self, expr: str) -> List[str]:
+        """Extract all {metric_name} patterns from expression."""
+        if not expr:
+            return []
+        pattern = r'\{([a-z_][a-z0-9_]*)\}'
+        return re.findall(pattern, expr, re.IGNORECASE)
+
+    def _populate_depends_on(self, metric_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Auto-populate depends_on field from expression."""
+        expression = metric_data.get("expression", "")
+        metric_refs = self._extract_metric_references(expression)
+
+        if metric_refs:
+            # Only set depends_on if there are references
+            metric_data["depends_on"] = metric_refs
+        elif "depends_on" not in metric_data:
+            # If no references and field not set, set to empty list
+            metric_data["depends_on"] = []
+
+        return metric_data
+
     def create(self, metric_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Create a new metric.
@@ -62,11 +84,14 @@ class MetricStore:
         path = self._get_metric_path(metric_name)
         if os.path.exists(path):
             raise ValueError(f"Metric '{metric_name}' already exists")
-        
+
+        # Auto-populate depends_on field from expression
+        metric_data = self._populate_depends_on(metric_data)
+
         # Add metadata
         metric_data["created_at"] = metric_data.get("created_at")
         metric_data["updated_at"] = metric_data.get("updated_at")
-        
+
         # Write YAML file
         with open(path, "w") as f:
             yaml.dump(metric_data, f, default_flow_style=False, sort_keys=False)
@@ -103,7 +128,10 @@ class MetricStore:
         updated = {**existing, **metric_data}
         updated["metric"] = metric_name  # Ensure name matches
         updated["updated_at"] = metric_data.get("updated_at")
-        
+
+        # Auto-populate depends_on field if expression changed
+        updated = self._populate_depends_on(updated)
+
         # Write back
         with open(path, "w") as f:
             yaml.dump(updated, f, default_flow_style=False, sort_keys=False)

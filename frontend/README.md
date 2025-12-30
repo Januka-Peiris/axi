@@ -1,73 +1,83 @@
-# React + TypeScript + Vite
+# AXI Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Semantic Explorer UI for AXI - a React application for browsing and querying your semantic layer.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Metrics Explorer**: Browse, compare, and analyze metrics
+- **Dimension Analysis**: Explore dimensions and their relationships
+- **Entity Graph**: Visualize entity relationships
+- **Query Builder**: Build semantic queries with live SQL preview
+- **Business Glossary**: Search and browse business terms
+- **Saved Queries**: Save and reuse common queries
 
-## React Compiler
+## Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- React 18 + TypeScript
+- Vite (build tool)
+- Tailwind CSS (styling)
+- React Query (data fetching)
+- D3.js (visualizations)
 
-## Expanding the ESLint configuration
+## Development
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Prerequisites
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- Node.js 18+
+- npm or yarn
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### Setup
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+The UI will be available at http://localhost:5173
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Build
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+# Production build
+npm run build
+
+# Preview production build
+npm run preview
 ```
+
+### Linting
+
+```bash
+npm run lint
+```
+
+## Configuration
+
+The frontend connects to the AXI backend API. Configure the API URL via environment variables:
+
+```bash
+# .env.local
+VITE_API_URL=http://localhost:8000
+```
+
+## Project Structure
+
+```
+src/
+├── api/           # API client and hooks
+├── components/    # Reusable UI components
+├── features/      # Feature-specific modules
+│   ├── metrics/
+│   ├── dimensions/
+│   └── query/
+├── layout/        # Layout components (Shell, Nav)
+├── pages/         # Page components
+└── docs/          # In-app documentation (markdown)
+```
+
+## License
+
+MIT. See LICENSE.

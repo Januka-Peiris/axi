@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api/client';
-import { Loader2, ArrowLeftRight, Plus, X, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Loader2, ArrowLeftRight, X, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
 interface Metric {
     id?: number;
@@ -97,27 +97,6 @@ export const MetricCompare = () => {
             default:
                 return <Minus className="w-4 h-4 text-slate-400" />;
         }
-    };
-
-    const compareAttributes = (attr: string) => {
-        const values = comparisonData.map(d => {
-            switch (attr) {
-                case 'type':
-                    return d.metric.type;
-                case 'entity':
-                    return d.metric.entity_name || '-';
-                case 'grain':
-                    return d.metric.grain?.join(', ') || '-';
-                case 'expression':
-                    return d.metric.expression;
-                default:
-                    return '-';
-            }
-        });
-
-        // Check if all values are the same
-        const allSame = values.every(v => v === values[0]);
-        return { values, allSame };
     };
 
     return (

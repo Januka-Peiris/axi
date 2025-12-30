@@ -19,11 +19,18 @@ export const DimensionSelector: React.FC<DimensionSelectorProps> = ({ metric, se
         const abortController = new AbortController();
         
         if (metric) {
-            api.get(endpoints.dimensions, { params: { metric }, signal: abortController.signal })
+            api.get(endpoints.dimensions, { signal: abortController.signal })
                 .then(res => {
-                    if (!abortController.signal.aborted) {
-                        setReachable(res.data || {});
-                    }
+                    if (abortController.signal.aborted) return;
+                    const grouped: ReachableDimensions = {};
+                    (Array.isArray(res.data) ? res.data : []).forEach((dim: any) => {
+                        const entity = dim.entity_name || 'Uncategorized';
+                        const name = dim.dimension_name || dim.name;
+                        if (!name) return;
+                        if (!grouped[entity]) grouped[entity] = [];
+                        grouped[entity].push(name);
+                    });
+                    setReachable(grouped);
                 })
                 .catch(error => {
                     if (error.name !== 'AbortError') {
@@ -66,7 +73,7 @@ export const DimensionSelector: React.FC<DimensionSelectorProps> = ({ metric, se
                             </div>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                                 {dims.map(d => {
-                                    const fullDim = model === metric ? d : `${model}.${d}`;
+                                    const fullDim = model === 'Uncategorized' ? d : `${model}.${d}`;
                                     const isSelected = selectedDims.includes(fullDim);
                                     return (
                                         <div

@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, Database, BarChart3, Layers, Network, Terminal, Settings, BookOpen, Bookmark, GitFork, Command, Search } from 'lucide-react';
+import { LayoutDashboard, Database, BarChart3, Layers, Terminal, Settings, BookOpen, Bookmark, GitFork, Command, Search } from 'lucide-react';
 import clsx from 'clsx';
 import { CommandPalette } from '../components/CommandPalette';
 
@@ -19,8 +19,6 @@ const NavItem = ({ to, icon: Icon, label }: { to: string; icon: any; label: stri
 );
 
 export const Shell: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
-    const [commandPaletteOpen, setCommandPaletteOpen] = React.useState(false);
-
     return (
         <div className="flex h-screen bg-[#0d0f15] text-slate-200 selection:bg-cyan-500/30">
             {/* Command Palette */}
@@ -57,14 +55,13 @@ export const Shell: React.FC<{ children?: React.ReactNode }> = ({ children }) =>
                 </div>
 
                 <nav className="flex-1 px-3 space-y-1">
-                    <div className="px-4 py-2 text-xs font-bold text-slate-600 uppercase tracking-widest mt-4 mb-2">Platform</div>
+                    <div className="px-4 py-2 text-xs font-bold text-slate-600 uppercase tracking-widest mt-4 mb-2">Navigation</div>
+                    <NavItem to="/glossary" icon={BookOpen} label="Glossary" />
                     <NavItem to="/" icon={LayoutDashboard} label="Dashboard" />
                     <NavItem to="/models" icon={Database} label="Models" />
                     <NavItem to="/metrics" icon={BarChart3} label="Metrics" />
                     <NavItem to="/dimensions" icon={Layers} label="Dimensions" />
                     <NavItem to="/graph" icon={GitFork} label="Graph" />
-
-
 
                     <div className="px-4 py-2 text-xs font-bold text-slate-600 uppercase tracking-widest mt-6 mb-2">Tools</div>
                     <NavItem to="/saved-queries" icon={Bookmark} label="Saved Queries" />

@@ -2,6 +2,9 @@ import typer
 import os
 import sys
 import json
+import subprocess
+import atexit
+from importlib import metadata
 from typing import List, Optional
 
 # Ensure backend is in pythonpath
@@ -19,12 +22,22 @@ from axi.metadata.indexer import MetadataIndexer
 from axi.query.engine import SemanticQueryEngine
 from axi.execution.snowflake_runner import SnowflakeRunner
 
-app = typer.Typer()
+app = typer.Typer(
+    help="AXI Semantic Layer - Transform SQL into a semantic metrics layer",
+    no_args_is_help=True
+)
 
 from axi.config.settings import get_settings
 from axi.config.env_loader import load_env_file
 from .scaffold import scaffold_project
 from .generate import generate_metric, generate_dimension, generate_glossary, generate_rule_promotion
+from axi.semantic_store.factory import get_semantic_store
+from axi.glossary.term_store import GlossaryTermStore
+from axi.glossary.drift_detector import detect_drift
+from axi.glossary.candidate_nudges import suggest_candidates
+from axi.glossary.explanation import explain_subject
+from axi.glossary.impact_analysis import run_impact_analysis
+from axi.glossary.history_summary import summarize_changes
 
 # Load .env files before initializing settings
 load_env_file()
@@ -46,6 +59,53 @@ for name, sub_app in CLI_EXTENSIONS_REGISTRY.items():
     app.add_typer(sub_app, name=name)
 
 @app.command()
+def migrate(
+    from_backend: str = typer.Option("sqlite", "--from", help="Source backend (sqlite|postgres)"),
+    to_backend: str = typer.Option("postgres", "--to", help="Target backend (sqlite|postgres)"),
+    sqlite_path: str = typer.Option(None, "--sqlite-path", help="Path to source SQLite semantic_state.db"),
+    postgres_url: str = typer.Option(None, "--postgres-url", help="Target Postgres URL (overrides env/DATABASE_URL)"),
+    state_type: str = typer.Option(None, "--state-type", help="Optional state type filter (extracted|inferred|approved)"),
+):
+    """
+    Migrate semantic state between backends (non-destructive).
+    """
+    typer.echo(f"Starting migration from {from_backend} to {to_backend}...")
+    source = get_semantic_store(
+        storage_backend=from_backend,
+        sqlite_path=sqlite_path,
+        postgres_url=postgres_url if from_backend == "postgres" else None,
+    )
+    target = get_semantic_store(
+        storage_backend=to_backend,
+        sqlite_path=sqlite_path,
+        postgres_url=postgres_url,
+    )
+
+    migrated = 0
+    skipped = 0
+    try:
+        for state in source.query(state_type=state_type):
+            try:
+                target.write(
+                    state_type=state.state_type,
+                    payload=state.payload,
+                    version=state.version,
+                    project_id=state.project_id,
+                    state_id=state.id,
+                )
+                migrated += 1
+            except Exception as e:
+                skipped += 1
+                typer.echo(f"[WARN] Skipping {state.id}: {e}")
+    finally:
+        if hasattr(source, "close"):
+            source.close()
+        if hasattr(target, "close"):
+            target.close()
+
+    typer.echo(f"Migration complete. Migrated {migrated} states, skipped {skipped}.")
+
+@app.command()
 def scaffold(
     force: bool = typer.Option(False, "--force", help="Overwrite existing files")
 ):
@@ -55,7 +115,7 @@ def scaffold(
     scaffold_project(force=force)
 
 generate_app = typer.Typer()
-app.add_typer(generate_app, name="generate")
+app.add_typer(generate_app, name="generate", help="Generate metric, dimension, and glossary definitions")
 
 @generate_app.command("metric")
 def generate_metric_cmd(
@@ -300,6 +360,9 @@ def extract(
         try:
             if promotion_result and promotion_result.promoted and model.content:
                 meta = extract_metadata(model.content, model_name, config=config)
+                if meta.get("grain_status") == "not_detected":
+                    typer.echo(f"[SKIP] {model_name}: no grouping/aggregation detected (treated as staging/non-semantic).")
+                    continue
                 writer.write(meta)
                 stats["parsed"] += 1
                 
@@ -346,7 +409,7 @@ def extract(
     typer.echo("========================================")
 
 glossary_app = typer.Typer()
-app.add_typer(glossary_app, name="glossary")
+app.add_typer(glossary_app, name="glossary", help="Manage business glossary terms and definitions")
 
 @glossary_app.command("generate")
 def glossary_generate():
@@ -374,8 +437,221 @@ def glossary_search(query: str):
     results = store.search(query)
     typer.echo(json.dumps(results, indent=2))
 
+# Glossary term management
+term_store = GlossaryTermStore()
+
+@app.command()
+def version():
+    """
+    Show CLI and backend package versions.
+    """
+    try:
+        cli_version = metadata.version("axi-cli")
+    except metadata.PackageNotFoundError:
+        from axi_cli import __version__ as cli_version
+
+    try:
+        backend_version = metadata.version("axi-semantic")
+    except metadata.PackageNotFoundError:
+        try:
+            from axi.version import get_version as get_backend_version
+            backend_version = get_backend_version()
+        except Exception:
+            backend_version = "unknown"
+
+    typer.echo(json.dumps({
+        "cli": cli_version,
+        "backend": backend_version
+    }, indent=2))
+
+@glossary_app.command("list")
+def glossary_list():
+    """
+    List glossary terms (latest version).
+    """
+    terms = term_store.list_terms()
+    typer.echo(json.dumps([t.model_dump() for t in terms], indent=2, default=str))
+
+@glossary_app.command("show")
+def glossary_show(term: str):
+    """
+    Show a single glossary term.
+    """
+    t = term_store.get_term(term)
+    if not t:
+        typer.echo(f"Term '{term}' not found.")
+        raise typer.Exit(1)
+    typer.echo(json.dumps(t.model_dump(), indent=2, default=str))
+
+@glossary_app.command("create")
+def glossary_create(
+    term: str,
+    definition: str = typer.Option(..., "--definition", "-d"),
+    status: str = typer.Option("draft", "--status", help="draft|approved|deprecated"),
+    derived_from: str = typer.Option("", "--derived-from", help="Comma-separated metric/dimension names"),
+    applies_to_entities: str = typer.Option("", "--entities", help="Comma-separated entity names"),
+    synonyms: str = typer.Option("", "--synonyms", help="Comma-separated synonyms"),
+    scope: str = typer.Option(None, "--scope", help="Business scope (optional)"),
+    notes: str = typer.Option(None, "--notes", help="Optional notes"),
+):
+    """
+    Create a glossary term.
+    """
+    try:
+        t = term_store.create_term(
+            term=term,
+            definition=definition,
+            status=status,
+            derived_from=[i.strip() for i in derived_from.split(",") if i.strip()],
+            applies_to_entities=[e.strip() for e in applies_to_entities.split(",") if e.strip()],
+            synonyms=[s.strip() for s in synonyms.split(",") if s.strip()],
+            scope=scope,
+            notes=notes,
+        )
+        typer.echo(json.dumps(t.model_dump(), indent=2, default=str))
+    except Exception as e:
+        typer.echo(f"Error: {e}")
+        raise typer.Exit(1)
+
+@glossary_app.command("edit")
+def glossary_edit(
+    term: str,
+    definition: str = typer.Option(None, "--definition", "-d"),
+    status: str = typer.Option(None, "--status", help="draft|approved|deprecated"),
+    derived_from: str = typer.Option(None, "--derived-from", help="Comma-separated metric/dimension names"),
+    applies_to_entities: str = typer.Option(None, "--entities", help="Comma-separated entity names"),
+    synonyms: str = typer.Option(None, "--synonyms", help="Comma-separated synonyms"),
+    scope: str = typer.Option(None, "--scope", help="Business scope (optional)"),
+    notes: str = typer.Option(None, "--notes", help="Optional notes"),
+):
+    """
+    Edit a glossary term (creates new version).
+    """
+    try:
+        derived = [i.strip() for i in derived_from.split(",")] if derived_from else None
+        ents = [e.strip() for e in applies_to_entities.split(",")] if applies_to_entities else None
+        syns = [s.strip() for s in synonyms.split(",")] if synonyms else None
+        t = term_store.edit_term(
+            term=term,
+            definition=definition,
+            status=status,
+            derived_from=derived if derived is not None else None,
+            applies_to_entities=ents if ents is not None else None,
+            synonyms=syns if syns is not None else None,
+            scope=scope,
+            notes=notes,
+        )
+        typer.echo(json.dumps(t.model_dump(), indent=2, default=str))
+    except Exception as e:
+        typer.echo(f"Error: {e}")
+        raise typer.Exit(1)
+
+@glossary_app.command("deprecate")
+def glossary_deprecate(term: str):
+    """
+    Deprecate a glossary term (creates new version).
+    """
+    try:
+        t = term_store.deprecate_term(term)
+        typer.echo(json.dumps(t.model_dump(), indent=2, default=str))
+    except Exception as e:
+        typer.echo(f"Error: {e}")
+        raise typer.Exit(1)
+
+# Semantic drift check (advisory)
+semantic_app = typer.Typer()
+app.add_typer(semantic_app, name="semantic", help="Check semantic drift and alignment with glossary")
+
+@semantic_app.command("check")
+def semantic_check(term: str = typer.Option(None, "--term", help="Specific glossary term to check")):
+    """
+    Run semantic drift/conflict checks against approved glossary terms.
+    """
+    results = detect_drift(term_name=term)
+    if not results:
+        typer.echo("No findings.")
+        return
+    for r in results:
+        typer.echo(json.dumps(r, indent=2, default=str))
+
+@semantic_app.command("suggest")
+def semantic_suggest(item: str = typer.Option(None, "--item", help="Optional specific item to evaluate")):
+    """
+    Suggest promoted items that might merit a glossary term (advisory only).
+    """
+    results = suggest_candidates(item_name=item)
+    if not results:
+        typer.echo("No suggestions.")
+        return
+    for r in results:
+        typer.echo(json.dumps(r, indent=2, default=str))
+
+@semantic_app.command("explain")
+def semantic_explain(
+    subject: str = typer.Argument(..., help="Metric or entity name"),
+    subject_type: str = typer.Option("metric", "--type", "-t", help="metric|entity")
+):
+    """
+    Explain a metric/entity using approved glossary language only.
+    """
+    res = explain_subject(subject, subject_type)
+    typer.echo(json.dumps(res, indent=2, default=str))
+
+@semantic_app.command("impact")
+def semantic_impact(
+    subject: str = typer.Option(None, "--subject", help="Glossary term or semantic item name"),
+    change_type: str = typer.Option("glossary_edit", "--change-type", help="glossary_edit|glossary_deprecate|semantic_change")
+):
+    """
+    Advisory impact awareness for glossary or semantic changes.
+    """
+    if not subject:
+        typer.echo("Please provide --subject")
+        raise typer.Exit(1)
+    res = run_impact_analysis(change_type=change_type, subject=subject)
+    if not res:
+        typer.echo("No impact findings.")
+        return
+    for r in res:
+        typer.echo(json.dumps(r, indent=2, default=str))
+
+# History summaries
+history_app = typer.Typer()
+app.add_typer(history_app, name="history", help="View glossary change history and summaries")
+
+@history_app.command("explain")
+def history_explain(term: str = typer.Option(None, "--term", help="Specific glossary term to summarize")):
+    """
+    Plain-English summaries of glossary changes (latest vs previous).
+    """
+    summaries = summarize_changes(term_name=term)
+    if not summaries:
+        typer.echo("No change summaries available.")
+        return
+    for s in summaries:
+        typer.echo(s["summary"])
+        if s.get("impact"):
+            typer.echo(f"Impact: {s['impact']}")
+        typer.echo("")
+
+# Diagnostics CLI (grain)
+diagnostics_app = typer.Typer()
+app.add_typer(diagnostics_app, name="diagnostics", help="Run diagnostic checks on semantic metadata")
+
+@diagnostics_app.command("grain")
+def diagnostics_grain(model: str = typer.Option(None, "--model", "-m", help="Optional model name to inspect")):
+    """
+    Generate semantic grain diagnostics (advisory, read-only).
+    """
+    from axi.diagnostics import grain_report
+    report = grain_report.full_report(model_name=model)
+    if model and not report.get("models"):
+        typer.echo(f"No model named '{model}' found in metadata.")
+        raise typer.Exit(1)
+    typer.echo(json.dumps(report, indent=2, default=str))
+
 metrics_app = typer.Typer()
-app.add_typer(metrics_app, name="metrics")
+app.add_typer(metrics_app, name="metrics", help="List, describe, and query metrics")
 
 @metrics_app.command("list")
 def metrics_list():
@@ -475,7 +751,7 @@ def metrics_search(tag: str = typer.Option(None, help="Tag to filter by")):
 
 # Cache CLI
 cache_app = typer.Typer()
-app.add_typer(cache_app, name="cache")
+app.add_typer(cache_app, name="cache", help="Manage query result cache")
 
 @cache_app.command("show")
 def cache_show():
@@ -504,7 +780,7 @@ def cache_clear(metric: str = typer.Option(None, help="Specific metric to clear"
 
 # Materialize CLI
 mat_app = typer.Typer()
-app.add_typer(mat_app, name="materialize")
+app.add_typer(mat_app, name="materialize", help="Create and refresh materialized metric tables")
 
 @mat_app.command("create")
 def mat_create(
@@ -540,7 +816,7 @@ def mat_refresh(
 
 # Mart CLI
 mart_app = typer.Typer()
-app.add_typer(mart_app, name="mart")
+app.add_typer(mart_app, name="mart", help="Create semantic marts (multi-metric tables)")
 
 @mart_app.command("create")
 def mart_create(
@@ -563,7 +839,7 @@ def mart_create(
 
 dbt_app = typer.Typer()
 
-app.add_typer(dbt_app, name="dbt")
+app.add_typer(dbt_app, name="dbt", help="Load and analyze dbt manifests and models")
 
 @dbt_app.command("manifest")
 def dbt_manifest(path: str = typer.Argument(..., help="Path to manifest.json")):
@@ -717,6 +993,9 @@ def dbt_scan():
         model_name = os.path.splitext(os.path.basename(model.path))[0]
         try:
             meta = extract_metadata(model.content, model_name, config=config)
+            if meta.get("grain_status") == "not_detected":
+                typer.echo(f"[SKIP] {model_name}: no grouping/aggregation detected (treated as staging/non-semantic).")
+                continue
             writer.write(meta)
             stats["parsed"] += 1
         except Exception as e:
@@ -808,7 +1087,7 @@ def query(
         if run:
             typer.echo("Thinking... (Executing on Snowflake)")
             runner = SnowflakeRunner()
-            rows, cols = runner.execute_query(sql)
+            rows, cols, _ = runner.execute_query(sql)
             # Basic table print
             typer.echo(f"Query Result ({len(rows)} rows):")
             typer.echo(f"{' | '.join(cols)}")
@@ -827,43 +1106,128 @@ def query(
 @app.command()
 def ui(
     host: str = typer.Option("localhost", help="Host to bind to"),
-    port: int = typer.Option(8000, help="Port to bind to")
+    port: int = typer.Option(8000, help="Port to bind to"),
+    frontend: bool = typer.Option(False, "--frontend", help="Also start the frontend dev server (npm required)"),
+    frontend_port: int = typer.Option(5173, "--frontend-port", help="Port for the Vite dev server")
 ):
     """
     Start the Semantic Explorer UI (Backend API).
     """
     import uvicorn
     
+    frontend_proc = None
+    frontend_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(current_dir)), "frontend"))
+
+    if frontend:
+        if not os.path.exists(os.path.join(frontend_dir, "package.json")):
+            typer.echo(f"[WARN] Frontend not found at {frontend_dir}; skipping frontend start.")
+        else:
+            try:
+                typer.echo(f"Starting frontend dev server (npm run dev -- --host --port {frontend_port}) in {frontend_dir}")
+                frontend_proc = subprocess.Popen(
+                    ["npm", "run", "dev", "--", "--host", "--port", str(frontend_port)],
+                    cwd=frontend_dir,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                )
+                atexit.register(lambda: frontend_proc and frontend_proc.terminate())
+            except FileNotFoundError:
+                typer.echo("[ERROR] npm not found. Install Node/npm to run the frontend or start it manually.")
+                frontend_proc = None
+
     typer.echo(f"Starting AXI API at http://{host}:{port}")
-    typer.echo("To view the UI, run the following in another terminal:")
-    typer.echo("  cd frontend && npm run dev")
-    typer.echo("Then open http://localhost:5173")
+    if not frontend:
+        typer.echo("To view the UI, run in another terminal:")
+        typer.echo("  cd frontend && npm run dev")
+        typer.echo(f"Then open http://{host}:{frontend_port}")
+    else:
+        typer.echo(f"Frontend dev server will be available at http://{host}:{frontend_port}")
     
     # Run uvicorn programmatically
     # We need to target the app object.
     # Assuming axi is installed as package, or we use string reference.
     # To work in dev setup without package install, we might need sys path hacks handled above.
     
-    uvicorn.run("axi.api.main:app", host=host, port=port, reload=True, app_dir=backend_path)
+    try:
+        # Change to backend directory for proper module loading
+        original_dir = os.getcwd()
+        os.chdir(backend_path)
+        uvicorn.run("axi.api.main:app", host=host, port=port, reload=True)
+    finally:
+        if frontend_proc and frontend_proc.poll() is None:
+            frontend_proc.terminate()
+        # Restore original directory
+        try:
+            os.chdir(original_dir)
+        except:
+            pass
 
 @app.command()
 def snowflake(
-    action: str = typer.Argument(..., help="sync, tables, columns, lineage, policies"),
-    arg: str = typer.Argument(None, help="Table name for columns/lineage")
+    action: str = typer.Argument(..., help="sync, tables, columns, lineage, policies, constraints"),
+    arg: str = typer.Argument(None, help="Table name for columns/lineage"),
+    schemas: Optional[str] = typer.Option(None, "--schemas", help="Comma-separated list of schemas to sync (e.g., 'MARTS,ANALYTICS')"),
+    views: Optional[str] = typer.Option(None, "--views", help="Comma-separated view patterns for semantic extraction (e.g., 'mart_%,fact_%')"),
+    skip_constraints: bool = typer.Option(False, "--skip-constraints", help="Skip PK/FK constraint detection"),
+    skip_inferred: bool = typer.Option(False, "--skip-inferred", help="Skip inferring relationships from naming conventions"),
+    skip_semantic: bool = typer.Option(False, "--skip-semantic", help="Skip semantic metadata extraction from views"),
 ):
     """
-    Manage Snowflake integration.
-    Actions: sync, tables, columns <table>, lineage <table>, policies
+    Manage Snowflake direct integration (no dbt required).
+
+    Actions:
+      - sync: Full sync of Snowflake metadata + semantic extraction from views
+      - tables: List all synced tables
+      - columns <table>: List columns for a table
+      - lineage: Show table lineage from Snowflake
+      - policies: List masking and row access policies
+      - constraints: List detected PK/FK constraints
+
+    Examples:
+      # Full sync with semantic extraction
+      axi snowflake sync
+
+      # Sync specific schemas only
+      axi snowflake sync --schemas MARTS,ANALYTICS
+
+      # Sync with view pattern filtering for semantic extraction
+      axi snowflake sync --views "mart_%,fact_%"
+
+      # Sync without semantic extraction (schema metadata only)
+      axi snowflake sync --skip-semantic
     """
     from axi.snowflake.extractor import SnowflakeMetadataExtractor
-    
+
     indexer = MetadataIndexer(METADATA_DIR)
-    
+
     if action == "sync":
+        typer.echo("🔄 Starting Snowflake metadata sync...")
+        typer.echo(f"   Metadata dir: {METADATA_DIR}")
+
+        # Parse optional parameters
+        schema_list = [s.strip() for s in schemas.split(",")] if schemas else None
+        view_patterns = [v.strip() for v in views.split(",")] if views else None
+
+        if schema_list:
+            typer.echo(f"   Schemas: {', '.join(schema_list)}")
+        if view_patterns:
+            typer.echo(f"   View patterns: {', '.join(view_patterns)}")
+
         extractor = SnowflakeMetadataExtractor(indexer)
-        extractor.sync()
-        typer.echo("Sync complete.")
-        
+        extractor.sync(
+            include_constraints=not skip_constraints,
+            infer_relationships=not skip_inferred,
+            extract_semantic=not skip_semantic,
+            schemas=schema_list,
+            view_patterns=view_patterns
+        )
+
+        typer.echo("✅ Snowflake sync complete!")
+        typer.echo("\nNext steps:")
+        typer.echo("  - View metrics: axi metrics list")
+        typer.echo("  - View entities: axi entities list")
+        typer.echo("  - Start UI: axi ui")
+
     elif action == "tables":
         tables = indexer.list_sf_tables()
         typer.echo(json.dumps(tables, indent=2, default=str))
@@ -882,7 +1246,19 @@ def snowflake(
     elif action == "lineage":
         lin = indexer.list_sf_lineage(arg)
         typer.echo(json.dumps(lin, indent=2, default=str))
-        
+
+    elif action == "constraints":
+        extractor = SnowflakeMetadataExtractor(indexer)
+        constraints = extractor.list_constraints()
+        if constraints:
+            typer.echo(f"\nFound {len(constraints)} constraints:\n")
+            for c in constraints:
+                typer.echo(f"  {c['table_name']}.{c['columns']} ({c['type']})")
+                if c['referenced_table']:
+                    typer.echo(f"    → {c['referenced_table']}.{c['referenced_columns']}")
+        else:
+            typer.echo("No constraints found. Run 'axi snowflake sync' first.")
+
     else:
         typer.echo(f"Unknown action: {action}")
 
@@ -918,12 +1294,39 @@ def demo(
         original_dir = os.getcwd()
         try:
             os.chdir(output)
-            # Run extraction
-            indexer = MetadataIndexer(os.path.join(output, "metadata_store"))
-            from axi.extractor.core import MetadataExtractor
-            extractor = MetadataExtractor(indexer, base_path=output)
-            result = extractor.extract_all()
-            typer.echo(f"Extracted {result.get('models_extracted', 0)} models, {result.get('metrics_extracted', 0)} metrics")
+            metadata_dir = os.path.join(output, "metadata_store")
+            indexer = MetadataIndexer(metadata_dir)
+            writer = MetadataWriter(metadata_dir)
+
+            # Load config for promotion rules
+            config_path = os.path.join(output, "axi.yml")
+            if os.path.exists(config_path):
+                config = load_config(config_path)
+            else:
+                from axi.config.loader import Config, PromotionRules
+                config = Config(include=PromotionRules(folders=["models/*"], tags=["axi"]))
+
+            promotion_engine = PromotionEngine(config)
+            scanner = SqlScanner(os.path.join(output, "models"), promotion_engine)
+
+            stats = {"scanned": 0, "parsed": 0, "metrics_extracted": 0, "failed": 0}
+            for model in scanner.scan():
+                stats["scanned"] += 1
+                model_name = os.path.splitext(os.path.basename(model.path))[0]
+                promotion_result = getattr(model, "promotion_result", None)
+                if promotion_result and promotion_result.promoted and model.content:
+                    try:
+                        meta = extract_metadata(model.content, model_name, config=config)
+                        writer.write(meta)
+                        stats["parsed"] += 1
+                        stats["metrics_extracted"] += len(meta.get("metrics", []))
+                    except Exception:
+                        stats["failed"] += 1
+                else:
+                    stats["failed"] += 1
+
+            indexer.build_index()
+            typer.echo(f"Extracted {stats['parsed']} models, {stats['metrics_extracted']} metrics")
         finally:
             os.chdir(original_dir)
 

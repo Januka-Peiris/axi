@@ -1,33 +1,100 @@
-# Licensing Model
+# Licensing
 
-AXI Open Source (AXI OSS) uses a **dual-license structure** to balance open-source freedom with sustainable business practices.
+AXI uses a dual-license structure to balance open-source freedom with sustainable development.
 
-## Overview
+<br>
 
-| Component | License | Description |
-| :--- | :--- | :--- |
-| **Backend Engine** | BSL 1.1 | Proprietary source-available. Converts to MIT after 3 years. |
-| **CLI** | MIT | Permissive open-source. |
-| **UI** | MIT | Permissive open-source. |
-| **Examples & Docs** | MIT | Permissive open-source. |
+---
 
-## What is BSL 1.1?
+## License Summary
 
-The **Business Source License (BSL)** is a source-available license that allows you to copy, modify, redistribute, and use the code for almost any purpose.
+<br>
 
-**The Restriction:**
-You cannot use the Backend Engine to provide a "Database-as-a-Service" or "Semantic-Layer-as-a-Service" that competes with AXI Cloud.
+| Component | License | Notes |
+|-----------|---------|-------|
+| **Backend Engine** | BSL 1.1 | Source-available, converts to MIT in 2027 |
+| **CLI** | MIT | Fully open source |
+| **Frontend UI** | MIT | Fully open source |
+| **Examples & Docs** | MIT | Fully open source |
 
-**The Change Date:**
-On **2027-01-01**, the code automatically re-licenses to standard MIT, becoming fully open source forever.
+<br>
 
-## FAQ
+---
 
-**Can I use AXI in my company?**
-Yes. You can run it internally for your data team without restriction.
+## Business Source License (BSL 1.1)
 
-**Can I build a product on AXI?**
-Yes, as long as the product isn't just "hosting AXI for others." If you embed AXI into an application (e.g., an internal data portal), that is permitted.
+The backend engine uses the **Business Source License**, which allows you to:
 
-**Can I fork the UI?**
-Yes, the UI is MIT licensed.
+<br>
+
+- Copy and modify the code
+<br>
+
+- Use it internally without restriction
+<br>
+
+- Redistribute the code
+<br>
+
+- Build products that embed AXI
+
+<br>
+
+### The Restriction
+
+You cannot use the Backend Engine to provide a competing hosted service (Database-as-a-Service or Semantic-Layer-as-a-Service).
+
+<br>
+
+### Change Date
+
+On **2027-01-01**, the backend code automatically converts to MIT license, becoming fully open source.
+
+<br>
+
+---
+
+## Frequently Asked Questions
+
+<br>
+
+### Can I use AXI in my company?
+
+**Yes.** You can run AXI internally for your data team without any restrictions.
+
+<br>
+
+### Can I build a product on AXI?
+
+**Yes.** As long as the product isn't just "hosting AXI for others." If you embed AXI into your application (e.g., an internal data portal), that's allowed.
+
+<br>
+
+### Can I modify the backend code?
+
+**Yes.** You can modify and redistribute the code, with the same BSL license terms.
+
+<br>
+
+### Can I fork the UI or CLI?
+
+**Yes.** They're MIT licensed, so you can use them however you like.
+
+<br>
+
+### What happens after 2027?
+
+The backend becomes MIT licensed - fully open source with no restrictions.
+
+<br>
+
+---
+
+## More Information
+
+<br>
+
+- [BSL 1.1 License Text](https://mariadb.com/bsl11/)
+<br>
+
+- [AXI License Files](/LICENSE)

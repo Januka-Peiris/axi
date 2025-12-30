@@ -22,6 +22,7 @@ from axi.query.graph import SemanticGraph
 from axi.query.engine import SemanticQueryEngine
 from axi.execution.snowflake_runner import SnowflakeRunner
 from axi.config.settings import get_settings
+from axi.version import get_version as get_backend_version
 from axi.utils.logging_config import setup_logging, get_logger
 from axi.utils.sanitization import (
     validate_metric_name,
@@ -65,6 +66,10 @@ app.add_middleware(
 @app.get("/")
 def health_check():
     return {"status": "ok", "service": "AXI Semantic Layer"}
+
+@app.get("/version")
+def version():
+    return {"version": get_backend_version()}
 
 # Plugin Init
 from axi.plugins.loader import PluginLoader
@@ -178,6 +183,9 @@ def extract_metadata_endpoint(req: ExtractRequest):
         model_name = os.path.splitext(os.path.basename(model.path))[0]
         try:
             meta = extract_metadata(model.content, model_name)
+            if meta.get("grain_status") == "not_detected":
+                logger.info(f"[SKIP] {model_name}: no grouping/aggregation detected (treated as staging/non-semantic).")
+                continue
             writer.write(meta)
             extracted_count += 1
         except (ValueError, KeyError) as e:
@@ -197,100 +205,9 @@ def extract_metadata_endpoint(req: ExtractRequest):
         "errors": errors
     }
 
-@app.get("/metrics")
-def list_metrics():
-    indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
-    return indexer.list_metrics()
+# Metrics endpoints are now handled by /api/metrics router
 
-@app.get("/metrics/{metric_name}")
-def get_metric(metric_name: str):
-    # Validate metric name
-    try:
-        metric_name = validate_metric_name(metric_name)
-    except ValueError as ve:
-        raise HTTPException(status_code=400, detail=ValidationError(str(ve), code="INVALID_METRIC_NAME").to_dict())
-    
-    indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
-    m = indexer.get_metric(metric_name)
-    if not m:
-         raise HTTPException(status_code=404, detail=MetadataError("Metric not found", code="METRIC_NOT_FOUND").to_dict())
-    return m
-
-@app.get("/metrics/{metric_name}/sql")
-def get_metric_sql(metric_name: str, dims: str = "", filters: str = "", compare: str = None, window: str = None):
-    # Validate metric name
-    try:
-        metric_name = validate_metric_name(metric_name)
-    except ValueError as ve:
-        raise HTTPException(status_code=400, detail=ValidationError(str(ve), code="INVALID_METRIC_NAME").to_dict())
-    
-    # Sanitize dimensions and filters
-    dim_list = []
-    if dims:
-        for d in dims.split(","):
-            d = d.strip()
-            if d:
-                try:
-                    dim_list.append(validate_dimension_name(d))
-                except ValueError:
-                    # Skip invalid dimensions
-                    logger.warning(f"Invalid dimension name: {d}")
-    
-    filter_list = []
-    if filters:
-        for f in filters.split(","):
-            f = f.strip()
-            if f:
-                filter_list.append(sanitize_string(f, max_length=500))
-    
-    indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
-    engine = SemanticQueryEngine(indexer)
-    try:
-        sql = engine.generate_sql(metric_name, dim_list, filter_list, dialect="ansi", compare=compare, window=window)
-        return {"sql": sql}
-    except QueryError as se:
-        raise HTTPException(
-            status_code=400,
-            detail={"code": se.code, "message": str(se), "hint": se.hint}
-        )
-    except ValueError as ve:
-        raise HTTPException(status_code=400, detail={"code": "VALIDATION_ERROR", "message": str(ve)})
-    except Exception as e:
-        logger.error(f"Unexpected error generating SQL: {e}")
-        raise HTTPException(status_code=500, detail={"code": "SQL_GENERATION_ERROR", "message": "Failed to generate SQL"})
-
-@app.get("/metrics/{metric_name}/dependencies")
-def get_metric_deps(metric_name: str):
-    # Validate metric name
-    try:
-        metric_name = validate_metric_name(metric_name)
-    except ValueError as ve:
-        raise HTTPException(status_code=400, detail=ValidationError(str(ve), code="INVALID_METRIC_NAME").to_dict())
-    
-    indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
-    m = indexer.get_metric(metric_name)
-    if not m:
-         raise HTTPException(status_code=404, detail=MetadataError("Metric not found", code="METRIC_NOT_FOUND").to_dict())
-    return {"dependencies": m.get('depends_on', [])}
-
-@app.get("/metrics/search")
-def search_metrics(tag: str = None):
-    # Sanitize tag if provided
-    if tag:
-        tag = sanitize_string(tag, max_length=100)
-    
-    indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
-    res = []
-    for m in indexer.list_metrics():
-        if tag:
-            if tag in m.get('tags', []):
-                res.append(m)
-        else:
-            res.append(m)
-    return res
-
-@app.get("/models")
-@app.get("/api/models")  # Also support /api/models for consistency
+@app.get("/api/models")
 def list_models():
     try:
         indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
@@ -319,8 +236,7 @@ def list_relationships():
     indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
     return indexer.list_relationships()
 
-@app.get("/entities")
-@app.get("/api/entities")  # Also support /api/entities for consistency
+@app.get("/api/entities")
 def list_entities():
     try:
         indexer = MetadataIndexer(settings.AXI_METADATA_DIR)
@@ -446,8 +362,7 @@ def get_entity_detail(name: str, include_pruned: bool = False):
         "grain": grain
     }
 
-@app.get("/graph")
-@app.get("/api/graph")  # Also support /api/graph for consistency
+@app.get("/api/graph")
 def graph():
     """
     Full global graph - DEBUG ONLY.

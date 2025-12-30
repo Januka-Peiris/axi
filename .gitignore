@@ -4,6 +4,9 @@
 .idea
 *.swp
 
+# Local AI agent context
+context/
+
 # Python
 __pycache__/
 *.py[cod]
@@ -61,4 +64,6 @@ frontend/build/
 # OS
 .DS_Store
 Thumbs.db
+axi-cloud
 
+.claude

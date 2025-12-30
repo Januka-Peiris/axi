@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, endpoints } from '../api/client';
-import { Database, Activity, GitGraph, Code } from 'lucide-react';
+import { Database, Activity, Code } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const StatCard = ({ label, value, icon: Icon, to }: any) => (

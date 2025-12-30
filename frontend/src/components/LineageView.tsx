@@ -9,11 +9,6 @@ interface LineageNode {
     level: number;
 }
 
-interface LineageEdge {
-    from: string;
-    to: string;
-}
-
 interface LineageViewProps {
     metricName: string;
 }
@@ -52,7 +47,7 @@ export const LineageView = ({ metricName }: LineageViewProps) => {
 
             try {
                 // Fetch metric dependencies
-                const response = await api.get(`/metrics/${encodeURIComponent(metricName)}/dependencies`);
+                const response = await api.get(`/api/metrics/${encodeURIComponent(metricName)}/dependencies`);
                 const data = response.data;
 
                 // Current metric node
@@ -82,7 +77,7 @@ export const LineageView = ({ metricName }: LineageViewProps) => {
                     });
                 }
                 if (data.source_tables) {
-                    data.source_tables.forEach((table: string, i: number) => {
+                    data.source_tables.forEach((table: string) => {
                         upstreamNodes.push({
                             id: `table_${table}`,
                             name: table,

@@ -7,12 +7,12 @@ import {
   LinkedEntitiesTable,
   SampleValuesPanel,
 } from './components';
-import { LocalSubgraph } from '../../components/graph/LocalSubgraph';
 import {
   useDimension,
   useDimensionMetrics,
   useDimensionEntities,
 } from './api';
+import { GlossaryTermList } from '../../components/glossary/GlossaryTermList';
 
 export const DimensionDetailPage: React.FC = () => {
   const { dimensionId } = useParams<{ dimensionId: string }>();
@@ -78,22 +78,6 @@ export const DimensionDetailPage: React.FC = () => {
         </div>
       )}
 
-      {/* Local Subgraph */}
-      <div className="space-y-4">
-        <h2 className="text-xl font-bold text-white">Graph View</h2>
-        {(() => {
-          const entityName = (dimension as any)?.entity || (dimension as any)?.entity_name;
-          const nodeId = entityName ? `dimension.${entityName}.${dimension.name}` : `dimension.${dimension.name}`;
-          return (
-        <LocalSubgraph 
-          nodeId={nodeId}
-          depth={1}
-          height="400px"
-        />
-          );
-        })()}
-      </div>
-
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Content */}
@@ -116,7 +100,7 @@ export const DimensionDetailPage: React.FC = () => {
 
         {/* Sidebar - Reserved for future content */}
         <div className="space-y-8">
-          {/* Placeholder for additional metadata or actions */}
+          <GlossaryTermList linkedEntity={dimension.name} />
         </div>
       </div>
     </div>

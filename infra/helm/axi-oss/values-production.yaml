@@ -1,0 +1,101 @@
+# Production values for AXI OSS
+# Use this as a template for your production deployment
+
+# API configuration
+api:
+  replicaCount: 2
+  image:
+    repository: ghcr.io/your-org/axi-oss
+    tag: "0.1.0"
+    pullPolicy: Always
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+
+# Frontend configuration
+frontend:
+  replicaCount: 2
+  image:
+    repository: ghcr.io/your-org/axi-oss-frontend
+    tag: "0.1.0"
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    kubernetes.io/tls-acme: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  apiHost: api.axi.example.com
+  frontendHost: axi.example.com
+  tls:
+    - secretName: axi-oss-tls
+      hosts:
+        - api.axi.example.com
+        - axi.example.com
+
+# Application configuration
+config:
+  logLevel: INFO
+  storage: postgres  # Use PostgreSQL for production
+  metadataDir: /app/data
+  snowflake:
+    account: "your-account"
+    user: "your-user"
+    warehouse: "COMPUTE_WH"
+    database: "YOUR_DB"
+    schema: "PUBLIC"
+
+# Secrets - USE EXISTING SECRET IN PRODUCTION
+secrets:
+  existingSecret: axi-oss-secrets
+
+# PostgreSQL configuration
+postgresql:
+  enabled: true
+  auth:
+    username: axi
+    database: axi
+    existingSecret: axi-oss-postgresql-secret
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+      storageClass: fast-ssd
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 250m
+        memory: 512Mi
+
+# Persistence
+persistence:
+  enabled: true
+  storageClass: fast-ssd
+  size: 20Gi
+
+# Monitoring
+monitoring:
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    labels:
+      release: prometheus

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Download, FileSpreadsheet, FileText, ChevronDown, Check, Loader2 } from 'lucide-react';
+import { Download, FileSpreadsheet, FileText, ChevronDown, Loader2 } from 'lucide-react';
 
 interface ExportButtonProps {
     data: {

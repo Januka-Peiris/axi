@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { api } from '../api/client';
-import { Loader2, AlertTriangle } from 'lucide-react';
+import { Loader2, AlertTriangle, Search, Check } from 'lucide-react';
 import { SemanticGraph } from '../components/graph/SemanticGraph';
 import type { VisGraphNode, VisGraphEdge } from '../components/graph/types';
 import { useNavigate } from 'react-router-dom';
 
 type Mode = 'local' | 'filtered' | 'categories';
+
+type NodeOption = { id: string; label: string; type: string };
 
 export const GraphExplore = () => {
   const [mode, setMode] = useState<Mode>('local');
@@ -18,16 +20,81 @@ export const GraphExplore = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [physics, setPhysics] = useState(false);
-    const [clustering, setClustering] = useState(false);
-    const [showLabels, setShowLabels] = useState<'hover' | 'always' | 'never'>('hover');
-    const [showDimensions, setShowDimensions] = useState(false);
-    const [nodeSize, setNodeSize] = useState<'small' | 'medium' | 'large'>('medium');
-    const [legend, setLegend] = useState(true);
-    const [hoveredNode, setHoveredNode] = useState<string | null>(null);
-    const [pathNodes, setPathNodes] = useState<string[]>([]);
-    const [pathEdges, setPathEdges] = useState<string[]>([]);
-    const [pathText, setPathText] = useState<string>('');
+  const [clustering, setClustering] = useState(false);
+  const [showLabels, setShowLabels] = useState<'hover' | 'always' | 'never'>('hover');
+  const [showDimensions, setShowDimensions] = useState(false);
+  const [nodeSize, setNodeSize] = useState<'small' | 'medium' | 'large'>('medium');
+  const [legend, setLegend] = useState(true);
+  const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+  const [pathNodes, setPathNodes] = useState<string[]>([]);
+  const [pathEdges, setPathEdges] = useState<string[]>([]);
+  const [pathText, setPathText] = useState<string>('');
+
+  // Autocomplete state
+  const [availableNodes, setAvailableNodes] = useState<NodeOption[]>([]);
+  const [searchInput, setSearchInput] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
   const navigate = useNavigate();
+
+  // Load available nodes for autocomplete
+  useEffect(() => {
+    const loadNodes = async () => {
+      try {
+        const [entitiesRes, metricsRes] = await Promise.all([
+          api.get('/api/entities'),
+          api.get('/api/metrics')
+        ]);
+
+        const options: NodeOption[] = [];
+
+        // Add entities
+        if (Array.isArray(entitiesRes.data)) {
+          entitiesRes.data.forEach((e: any) => {
+            if (e.name) {
+              options.push({
+                id: `entity.${e.name}`,
+                label: e.name,
+                type: 'entity'
+              });
+            }
+          });
+        }
+
+        // Add metrics
+        if (Array.isArray(metricsRes.data)) {
+          metricsRes.data.forEach((m: any) => {
+            if (m.name) {
+              options.push({
+                id: `metric.${m.name}`,
+                label: m.name,
+                type: 'metric'
+              });
+            }
+          });
+        }
+
+        setAvailableNodes(options);
+      } catch (err) {
+        console.error('Failed to load node options:', err);
+      }
+    };
+
+    loadNodes();
+  }, []);
+
+  // Handle click outside dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const buildParams = () => {
     const typeList = Object.entries(types)
@@ -187,14 +254,79 @@ export const GraphExplore = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         <div className="space-y-3 bg-[#151821] border border-white/10 rounded-lg p-4">
-          <div>
-            <label className="text-xs text-slate-400">Root Node</label>
-            <input
-              value={root}
-              onChange={(e) => setRoot(e.target.value)}
-              placeholder="entity.orders or metric.total_revenue"
-              className="w-full bg-[#0f172a] border border-white/10 rounded px-3 py-2 text-sm text-white"
-            />
+          <div className="relative" ref={dropdownRef}>
+            <label className="text-xs text-slate-400 block mb-1">Root Node</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <input
+                value={searchInput}
+                onChange={(e) => {
+                  setSearchInput(e.target.value);
+                  setShowDropdown(true);
+                }}
+                onFocus={() => setShowDropdown(true)}
+                placeholder="Search entities or metrics..."
+                className="w-full bg-[#0f172a] border border-white/10 rounded px-3 py-2 pl-9 text-sm text-white focus:outline-none focus:border-cyan-500/50"
+              />
+            </div>
+
+            {/* Selected node display */}
+            {root && (
+              <div className="mt-2 flex items-center gap-2 text-xs">
+                <span className="text-slate-400">Selected:</span>
+                <span className="px-2 py-1 bg-cyan-500/10 text-cyan-400 rounded border border-cyan-500/20">
+                  {root}
+                </span>
+                <button
+                  onClick={() => {
+                    setRoot('');
+                    setSearchInput('');
+                  }}
+                  className="text-slate-500 hover:text-red-400"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
+            {/* Autocomplete dropdown */}
+            {showDropdown && availableNodes.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 bg-[#0f172a] border border-white/10 rounded-lg shadow-xl max-h-64 overflow-y-auto">
+                {availableNodes
+                  .filter(node => {
+                    const search = searchInput.toLowerCase();
+                    return node.label.toLowerCase().includes(search) ||
+                           node.id.toLowerCase().includes(search);
+                  })
+                  .slice(0, 50)
+                  .map(node => (
+                    <button
+                      key={node.id}
+                      onClick={() => {
+                        setRoot(node.id);
+                        setSearchInput(node.label);
+                        setShowDropdown(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 hover:bg-white/5 flex items-center gap-2 transition-colors ${
+                        root === node.id ? 'bg-cyan-500/10 text-cyan-400' : 'text-slate-300'
+                      }`}
+                    >
+                      {root === node.id && <Check className="w-3 h-3" />}
+                      <div className="flex-1">
+                        <div className="font-medium">{node.label}</div>
+                        <div className="text-xs text-slate-500 capitalize">{node.type}</div>
+                      </div>
+                    </button>
+                  ))}
+                {availableNodes.filter(node => {
+                  const search = searchInput.toLowerCase();
+                  return node.label.toLowerCase().includes(search) ||
+                         node.id.toLowerCase().includes(search);
+                }).length === 0 && (
+                  <div className="px-3 py-2 text-slate-500 text-sm">No matches found</div>
+                )}
+              </div>
+            )}
           </div>
           <div>
             <label className="text-xs text-slate-400">Depth</label>

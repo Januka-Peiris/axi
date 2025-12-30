@@ -64,25 +64,11 @@ def extract_metadata(sql: str, model_name: str, config: Optional[Config] = None)
     dimensions: List[str] = []
     filters = []
     source_tables = []
-    grain = "unknown"
     relationships = []
     entity = {"name": model_name, "pk": None, "columns": []}
 
-    # Dimension candidates with roles
-    dim_roles: Dict[str, Set[str]] = {}
-    dim_reasons: Dict[str, str] = {}
-    metric_ref_columns: Set[str] = set()
     keep_overrides = set(config.dimensions.keep) if config and config.dimensions else set()
     drop_overrides = set(config.dimensions.drop) if config and config.dimensions else set()
-
-    def _add_role(name: str, role: str, reason_hint: Optional[str] = None):
-        if not name:
-            return
-        if name not in dim_roles:
-            dim_roles[name] = set()
-        dim_roles[name].add(role)
-        if reason_hint:
-            dim_reasons[name] = reason_hint
     
     # 1. Source Tables (FROM / JOIN) and Relationships
     alias_map = {}
@@ -143,89 +129,134 @@ def extract_metadata(sql: str, model_name: str, config: Optional[Config] = None)
 
     # 4. Parse JOINs for relationships
     # We look for explicit JOIN ... ON ...
+    # Now handles composite keys (multiple AND conditions)
+
+    def extract_join_conditions(on_condition) -> List[tuple]:
+        """
+        Extract all equality conditions from a JOIN ON clause.
+        Handles composite keys with AND conditions.
+        Returns list of (left_table, left_col, right_table, right_col) tuples.
+        """
+        conditions = []
+
+        if isinstance(on_condition, exp.EQ):
+            # Simple equality: a.col = b.col
+            left = on_condition.left
+            right = on_condition.right
+            if isinstance(left, exp.Column) and isinstance(right, exp.Column):
+                conditions.append((left.table, left.name, right.table, right.name))
+
+        elif isinstance(on_condition, exp.And):
+            # Composite key: a.col1 = b.col1 AND a.col2 = b.col2
+            # Recursively extract from left and right
+            conditions.extend(extract_join_conditions(on_condition.left))
+            conditions.extend(extract_join_conditions(on_condition.right))
+
+        elif isinstance(on_condition, exp.Paren):
+            # Parenthesized expression
+            conditions.extend(extract_join_conditions(on_condition.this))
+
+        return conditions
+
     for join in parsed.find_all(exp.Join):
         # Join target table (Parent Candidate)
         if isinstance(join.this, exp.Table):
             joined_table = join.this.name
-            
+
             # Extract ON condition
             on_condition = join.args.get("on")
             if on_condition:
-                if isinstance(on_condition, exp.EQ):
-                    left = on_condition.left
-                    right = on_condition.right
-                    
-                    if isinstance(left, exp.Column) and isinstance(right, exp.Column):
-                      left_table = left.table
-                      left_col = left.name
-                      right_table = right.table
-                      right_col = right.name
-                      
-                      # Resolve real table names
-                      # If table is empty, assume local table or handled elsewhere? 
-                      # Usually `col` vs `tab.col`. If `col` -> assume local?
-                      
-                      # DEBUG
-                      
-                      l_tab_real = alias_map.get(left_table, left_table) if left_table else model_name
-                      r_tab_real = alias_map.get(right_table, right_table) if right_table else model_name
-                      
-                      # Identify Parent vs Child
-                      # If joined_table matches one side, that side is Parent side.
-                      # Ideally joined_table (table name) matches l_tab_real or r_tab_real
-                      
-                      parent_model = "unknown"
-                      child_model = "unknown"
-                      pk_col = "unknown"
-                      fk_col = "unknown"
-  
-                      if l_tab_real == joined_table:
-                          parent_model = joined_table
-                          pk_col = left_col
-                          
-                          child_model = r_tab_real
-                          fk_col = right_col
-                      elif r_tab_real == joined_table:
-                          parent_model = joined_table
-                          pk_col = right_col
-                          
-                          child_model = l_tab_real
-                          fk_col = left_col
-                      
-                      if parent_model != "unknown" and parent_model != child_model:
-                           # Check if relationship already exists
-                           existing = any(
-                               r.get("parent_model") == parent_model and 
-                               r.get("child_model") == child_model
-                               for r in relationships
-                           )
-                           if not existing:
-                               relationships.append({
-                                  "parent_model": parent_model,
-                                  "child_model": child_model,
-                                  "fk_column": fk_col,
-                                  "pk_column": pk_col,
-                                  "join_type": join.kind if join.kind else "INNER" 
-                              })
-                               if fk_col:
-                                   _add_role(fk_col, "join_key", "join_key")
-                               if pk_col:
-                                   _add_role(pk_col, "join_key", "join_key")
-                               # Also relate the joined table to the current model so downstream joins
-                               # have keys even if compiled SQL is missing for some models.
-                               model_edge_exists = any(
-                                   r.get("parent_model") == parent_model and 
-                                   r.get("child_model") == model_name
-                                   for r in relationships
-                               )
-                               if not model_edge_exists and fk_col and pk_col:
-                                   relationships.append({
-                                      "parent_model": parent_model,
-                                      "child_model": model_name,
-                                      "fk_column": fk_col,
-                                      "pk_column": pk_col,
-                                      "join_type": join.kind if join.kind else "INNER" 
-                                   })
+                join_conditions = extract_join_conditions(on_condition)
+
+                # Process each condition
+                fk_columns = []
+                pk_columns = []
+                parent_model = None
+                child_model = None
+
+                for left_table, left_col, right_table, right_col in join_conditions:
+                    # Resolve real table names
+                    l_tab_real = alias_map.get(left_table, left_table) if left_table else model_name
+                    r_tab_real = alias_map.get(right_table, right_table) if right_table else model_name
+
+                    # Identify Parent vs Child
+                    # If joined_table matches one side, that side is Parent side.
+                    if l_tab_real == joined_table:
+                        if parent_model is None:
+                            parent_model = joined_table
+                            child_model = r_tab_real
+                        pk_columns.append(left_col)
+                        fk_columns.append(right_col)
+                    elif r_tab_real == joined_table:
+                        if parent_model is None:
+                            parent_model = joined_table
+                            child_model = l_tab_real
+                        pk_columns.append(right_col)
+                        fk_columns.append(left_col)
+
+                if parent_model and child_model and parent_model != child_model:
+                    # For composite keys, store as comma-separated
+                    fk_col = ",".join(fk_columns) if fk_columns else ""
+                    pk_col = ",".join(pk_columns) if pk_columns else ""
+
+                    # Check if relationship already exists
+                    existing = any(
+                        r.get("parent_model") == parent_model and
+                        r.get("child_model") == child_model
+                        for r in relationships
+                    )
+                    if not existing:
+                        relationships.append({
+                            "parent_model": parent_model,
+                            "child_model": child_model,
+                            "fk_column": fk_col,
+                            "pk_column": pk_col,
+                            "join_type": join.kind if join.kind else "INNER"
+                        })
+                        # Also relate the joined table to the current model
+                        model_edge_exists = any(
+                            r.get("parent_model") == parent_model and
+                            r.get("child_model") == model_name
+                            for r in relationships
+                        )
+                        if not model_edge_exists and fk_col and pk_col:
+                            relationships.append({
+                                "parent_model": parent_model,
+                                "child_model": model_name,
+                                "fk_column": fk_col,
+                                "pk_column": pk_col,
+                                "join_type": join.kind if join.kind else "INNER"
+                            })
+
+    # 5. Infer FK relationships from column naming conventions
+    # This helps when JOINs don't have explicit ON conditions or are implicit
+    def infer_fk_from_column_name(col_name: str, source_tables_set: set) -> Optional[tuple]:
+        """
+        Infer FK relationship from column naming conventions.
+        E.g., customer_id -> customers table, user_id -> users table
+        Returns (target_table, target_column) or None
+        """
+        col_lower = col_name.lower()
+        if not col_lower.endswith('_id') or col_lower == 'id':
+            return None
+
+        base_name = col_lower[:-3]  # Remove '_id'
+
+        # Try common plural/singular variations
+        candidates = [
+            base_name + 's',      # customer -> customers
+            base_name + 'es',     # box -> boxes
+            base_name,            # customer -> customer
+        ]
+        if base_name.endswith('s'):
+            candidates.append(base_name[:-1])  # customers -> customer
+
+        for candidate in candidates:
+            for table in source_tables_set:
+                if table.lower() == candidate:
+                    return (table, 'id')
+
+        return None
 
     # Extract relationships from FROM clauses (model dependencies)
     # If a model references another model in FROM, create a dependency relationship
@@ -257,11 +288,40 @@ def extract_metadata(sql: str, model_name: str, config: Optional[Config] = None)
     # sqlglot parses CTEs correctly - the parsed object IS the main SELECT with CTEs
     main_select = parsed
     if not isinstance(parsed, exp.Select):
-        # If parsed is not a Select, try to find one
         if hasattr(parsed, 'find'):
             main_select = parsed.find(exp.Select)
             if not main_select:
                 main_select = parsed
+
+    # Get all columns from the SELECT list to infer FK relationships
+    if isinstance(main_select, exp.Select):
+        source_tables_set = set(source_tables)
+        for column in main_select.find_all(exp.Column):
+            col_name = column.name
+            col_table = column.table
+            if col_name:
+                fk_info = infer_fk_from_column_name(col_name, source_tables_set)
+                if fk_info:
+                    target_table, target_col = fk_info
+                    # Determine the source model (the model containing the FK column)
+                    source_model = alias_map.get(col_table, col_table) if col_table else model_name
+
+                    if source_model and target_table and source_model != target_table:
+                        # Check if relationship already exists
+                        existing = any(
+                            r.get("parent_model") == target_table and
+                            r.get("child_model") == source_model and
+                            r.get("fk_column") == col_name
+                            for r in relationships
+                        )
+                        if not existing:
+                            relationships.append({
+                                "parent_model": target_table,
+                                "child_model": source_model,
+                                "fk_column": col_name,
+                                "pk_column": target_col,
+                                "join_type": "INFERRED_FK"
+                            })
 
     # Track metric names globally to avoid adding them as dimensions
     # Must be defined before functions that use it
@@ -337,159 +397,328 @@ def extract_metadata(sql: str, model_name: str, config: Optional[Config] = None)
         # sqlglot uses Literal for both strings and numbers
         return isinstance(expr, exp.Literal)
 
-    # 3. Dimensions Extraction (Priority Order)
-    # Priority 1: GROUP BY expressions (highest confidence - these ARE the grain)
-    def extract_dimensions_from_group_by(select_stmt: exp.Select):
-        """Extract dimensions from GROUP BY clause - highest priority"""
+    # Helpers for extraction in the new grain-first pipeline
+    def extract_column_name_from_expression(expr) -> str:
+        """Extract column name from an expression, handling Column, Alias, etc."""
+        if isinstance(expr, exp.Column):
+            return expr.alias_or_name or expr.sql()
+        elif isinstance(expr, exp.Alias):
+            if isinstance(expr.this, exp.Column):
+                return expr.this.alias_or_name or expr.this.sql()
+            return expr.alias_or_name or expr.sql()
+        elif isinstance(expr, exp.Identifier):
+            return expr.this or expr.sql()
+        elif isinstance(expr, exp.DateTrunc):
+            if expr.expressions:
+                first_expr = expr.expressions[0]
+                if isinstance(first_expr, exp.Column):
+                    return first_expr.alias_or_name or first_expr.sql()
+                elif isinstance(first_expr, exp.Identifier):
+                    return first_expr.this or first_expr.sql()
+            return expr.sql()
+        else:
+            columns = list(expr.find_all(exp.Column)) if hasattr(expr, 'find_all') else []
+            if columns:
+                return columns[0].alias_or_name or columns[0].sql()
+            return expr.sql()
+
+    def is_constant_or_literal(expr) -> bool:
+        if isinstance(expr, exp.Literal):
+            return True
+        if isinstance(expr, exp.Alias):
+            return is_constant_or_literal(expr.this)
+        return False
+
+    # Build CTE map for dependency resolution
+    cte_map: Dict[str, exp.Select] = {}
+    if isinstance(main_select, exp.Select) and main_select.ctes:
+        for cte in main_select.ctes:
+            if isinstance(cte.this, exp.Select):
+                cte_map[cte.alias] = cte.this
+
+    def _select_sources(select_stmt: exp.Select) -> List[exp.Expression]:
+        sources: List[exp.Expression] = []
         if not isinstance(select_stmt, exp.Select):
-            return
-        
-        group = select_stmt.find(exp.Group)
+            return sources
+        from_clause = select_stmt.args.get("from") or select_stmt.args.get("from_")
+        if from_clause and getattr(from_clause, "this", None):
+            sources.append(from_clause.this)
+        for join in select_stmt.args.get("joins") or []:
+            if getattr(join, "this", None):
+                sources.append(join.this)
+        return sources
+
+    def _source_kind(expr_node: exp.Expression) -> str:
+        if isinstance(expr_node, exp.Table):
+            if expr_node.name in cte_map:
+                return "cte"
+            return "table"
+        if isinstance(expr_node, exp.Subquery):
+            return "subquery"
+        if isinstance(expr_node, exp.Select):
+            return "subquery"
+        return "unknown"
+
+    def _has_group_or_distinct(select_stmt: exp.Select) -> bool:
+        if not isinstance(select_stmt, exp.Select):
+            return False
+        if select_stmt.args.get("group"):
+            return True
+        if select_stmt.args.get("distinct"):
+            return True
+        # Check for aggregates in this select only (not inside subqueries or CTEs)
+        def _has_aggregate_excluding_subqueries(node) -> bool:
+            """Walk tree looking for aggregates, but don't descend into subqueries."""
+            if isinstance(node, (exp.Subquery, exp.Select)):
+                # Don't descend into subqueries - aggregates there don't affect outer grain
+                return False
+            if isinstance(node, (exp.Sum, exp.Count, exp.Avg, exp.Min, exp.Max)):
+                return True
+            # Check children
+            for child in node.iter_expressions():
+                if _has_aggregate_excluding_subqueries(child):
+                    return True
+            return False
+
+        for expr in select_stmt.expressions or []:
+            if _has_aggregate_excluding_subqueries(expr):
+                return True
+        return False
+
+    def _find_grouped_cte_recursive(cte_name: str, visited: Set[str]) -> Optional[str]:
+        """
+        Recursively walk CTE chain to find the first CTE with GROUP BY or DISTINCT.
+        Returns the CTE name if found, None otherwise.
+        """
+        if cte_name in visited or cte_name not in cte_map:
+            return None
+        visited.add(cte_name)
+
+        cte_select = cte_map[cte_name]
+        if _has_group_or_distinct(cte_select):
+            return cte_name
+
+        # Walk through sources of this CTE
+        sources = _select_sources(cte_select)
+        for src in sources:
+            if isinstance(src, exp.Table) and src.name in cte_map:
+                result = _find_grouped_cte_recursive(src.name, visited)
+                if result:
+                    return result
+        return None
+
+    # Decide semantic-producing node
+    semantic_select = main_select
+    semantic_node = model_name
+    grain_scope = "outer"
+    grain_reasons: List[str] = []
+
+    main_sources = _select_sources(main_select) if isinstance(main_select, exp.Select) else []
+    main_has_grouping = _has_group_or_distinct(main_select)
+    cte_refs_in_main = set()
+    for src in main_sources:
+        if isinstance(src, exp.Table) and src.name in cte_map:
+            cte_refs_in_main.add(src.name)
+
+    if not main_has_grouping and main_sources:
+        kinds = [_source_kind(src) for src in main_sources]
+        if len(main_sources) == 1 and kinds[0] == "cte" and isinstance(main_sources[0], exp.Table):
+            cte_name = main_sources[0].name
+            if cte_name in cte_map:
+                semantic_select = cte_map[cte_name]
+                semantic_node = cte_name
+                grain_scope = "cte"
+        elif len(cte_refs_in_main) > 1 or (len(main_sources) > 1 and all(k in ("cte", "subquery") for k in kinds)):
+            # Multiple semantic-producing inputs with no aggregation: ambiguous
+            grain_reasons.append("multiple semantic-producing sources detected")
+            return {
+                "model": model_name,
+                "metrics": [],
+                "dimensions": [],
+                "dimension_details": [],
+                "filters": filters,
+                "source_tables": source_tables,
+                "entity": entity,
+                "relationships": relationships,
+                "grain_status": "ambiguous",
+                "grain_detection": "none",
+                "grain_columns": [],
+                "semantic_intent": "aggregation_like",
+                "semantic_node": "unknown",
+                "grain_scope": "cte",
+                "grain_reasons": grain_reasons,
+            }
+
+    # If the semantic_select is still pass-through (no group/distinct) and points to a single CTE source,
+    # walk down one hop to find the first grouped/distinct CTE (common in dbt compiled SQL).
+    visited = set()
+    while isinstance(semantic_select, exp.Select) and not _has_group_or_distinct(semantic_select):
+        sources = _select_sources(semantic_select)
+        if len(sources) != 1 or not isinstance(sources[0], exp.Table):
+            break
+        next_name = sources[0].name
+        if not next_name or next_name in visited or next_name not in cte_map:
+            break
+        visited.add(next_name)
+        semantic_select = cte_map[next_name]
+        semantic_node = next_name
+        grain_scope = "cte"
+
+    # If still no grouping, but the select joins a grouped/distinct CTE plus dimension tables, pick that grouped CTE.
+    # Use recursive search to find grouped CTEs even through intermediate pass-through CTEs.
+    if isinstance(semantic_select, exp.Select) and not _has_group_or_distinct(semantic_select):
+        sources = _select_sources(semantic_select)
+        grouped_ctes = []
+        for src in sources:
+            if isinstance(src, exp.Table) and src.name in cte_map:
+                # Recursively find the grouped CTE in the chain
+                grouped_cte_name = _find_grouped_cte_recursive(src.name, set())
+                if grouped_cte_name:
+                    grouped_ctes.append(grouped_cte_name)
+        # Deduplicate in case multiple paths lead to the same CTE
+        grouped_ctes = list(dict.fromkeys(grouped_ctes))
+        if len(grouped_ctes) == 1:
+            semantic_select = cte_map[grouped_ctes[0]]
+            semantic_node = grouped_ctes[0]
+            grain_scope = "cte"
+        elif len(grouped_ctes) > 1:
+            grain_reasons.append("multiple grouped CTE sources detected without regrouping")
+            return {
+                "model": model_name,
+                "metrics": [],
+                "dimensions": [],
+                "dimension_details": [],
+                "filters": filters,
+                "source_tables": source_tables,
+                "entity": entity,
+                "relationships": relationships,
+                "grain_status": "ambiguous",
+                "grain_detection": "none",
+                "grain_columns": [],
+                "semantic_intent": "aggregation_like",
+                "semantic_node": "unknown",
+                "grain_scope": "cte",
+                "grain_reasons": grain_reasons,
+            }
+
+    # Grain-first detection on semantic-producing select
+    group_by_cols: List[str] = []
+    distinct_cols: List[str] = []
+    if isinstance(semantic_select, exp.Select):
+        group = semantic_select.find(exp.Group)
         if group:
             for expression in group.expressions:
                 dim_name = extract_column_name_from_expression(expression)
                 if dim_name:
-                    _add_role(dim_name, "group_by", "group_by")
-                
-                # Check for DATE_TRUNC to infer grain
-                if isinstance(expression, exp.DateTrunc):
-                    try:
-                        unit_arg = expression.args.get('unit')
-                        if unit_arg and isinstance(unit_arg, exp.Literal):
-                            grain = unit_arg.this.lower() 
-                        elif expression.expressions and isinstance(expression.expressions[0], exp.Literal):
-                             grain = expression.expressions[0].this.lower()
-                    except:
-                        pass
-    
-    # Priority 2: WHERE clause column references (filterable dimensions)
-    def extract_dimensions_from_where(select_stmt: exp.Select):
-        """Extract column references from WHERE clause - medium priority"""
-        if not isinstance(select_stmt, exp.Select):
-            return
-        
-        where_clause = select_stmt.find(exp.Where)
-        if where_clause:
-            columns = where_clause.find_all(exp.Column)
-            for col in columns:
-                dim_name = col.alias_or_name or col.sql()
+                    group_by_cols.append(dim_name)
+        if semantic_select.args.get("distinct"):
+            for expression in semantic_select.expressions:
+                if is_constant_or_literal(expression):
+                    continue
+                dim_name = extract_column_name_from_expression(expression)
                 if dim_name:
-                    _add_role(dim_name, "where_filter", "where_filter")
-    
-    # Priority 3: Non-aggregate SELECT columns (filtered)
-    def extract_dimensions_from_select(select_stmt: exp.Select, group_by_cols: set):
-        """Extract dimensions from non-aggregate SELECT columns - lowest priority
-        
-        Args:
-            select_stmt: The SELECT statement to process
-            group_by_cols: Set of column names already in GROUP BY (to avoid duplicates)
-        """
+                    distinct_cols.append(dim_name)
+
+    group_by_cols = list(dict.fromkeys(group_by_cols))
+    distinct_cols = list(dict.fromkeys(distinct_cols))
+
+    aggregates_present = _has_group_or_distinct(semantic_select)
+
+    grain_detection = "none"
+    grain_columns: List[str] = []
+    if group_by_cols:
+        grain_detection = "group_by"
+        grain_columns = group_by_cols
+    elif distinct_cols:
+        grain_detection = "distinct"
+        grain_columns = distinct_cols
+
+    fanout_risk = any(
+        rel.get("parent_model") == model_name and rel.get("fk_column")
+        for rel in relationships
+    )
+
+    grain_status = "not_detected"
+    if grain_columns:
+        grain_status = "unsafe" if fanout_risk else "clear"
+        if fanout_risk:
+            grain_reasons.append("fan-out risk from joins")
+    elif main_sources and len(main_sources) > 1 and any(_source_kind(s) in ("cte", "subquery") for s in main_sources):
+        grain_status = "ambiguous"
+        grain_reasons.append("multiple sources without aggregation")
+
+    semantic_intent = "raw_like"
+    if grain_status == "clear":
+        semantic_intent = "semantic_candidate"
+    elif grain_detection in ("group_by", "distinct") or aggregates_present:
+        semantic_intent = "aggregation_like"
+
+    # Dimensions: only grain columns when grain is clear
+    dimension_details = []
+    if grain_columns:
+        for col in grain_columns:
+            included = grain_status == "clear" and col not in drop_overrides
+            reason = "group_by" if grain_detection == "group_by" else "distinct"
+            if col in drop_overrides:
+                included = False
+                reason = "drop_override"
+            elif col in keep_overrides:
+                included = True
+                reason = "user_keep"
+            elif grain_status != "clear":
+                included = False
+                reason = "grain_unsafe"
+            if included:
+                dimensions.append(col)
+            dimension_details.append({
+                "name": col,
+                "included": included,
+                "reason": reason,
+                "roles": ["grain"]
+            })
+    else:
+        # Explicitly record the absence of dimensions for transparency
+        dimension_details.append({
+            "name": None,
+            "included": False,
+            "reason": "no_grouping_detected",
+            "roles": []
+        })
+
+    # Metrics: only when grain is clear
+    metric_names_global: Set[str] = set()
+    metric_ref_columns: Set[str] = set()
+
+    def extract_metrics_from_select(select_stmt: exp.Select):
+        if grain_status != "clear":
+            return
         if not isinstance(select_stmt, exp.Select):
             return
-        
-        for expression in select_stmt.expressions:
-            alias = expression.alias_or_name
-            if alias:
-                entity["columns"].append(alias)
-                
-            # Infer PK from naming convention 'id' or explicit alias 'id'
-            if alias and alias.lower() == 'id':
-                entity["pk"] = alias
-            elif alias and alias.lower() == f"{model_name}_id":
-                 entity["pk"] = alias
-            
-            # Get the underlying expression node
-            expr_node = expression.this if isinstance(expression, exp.Alias) else expression
-            
-            # Skip if it's a metric (has aggregations or is a known metric name)
-            aggregations = list(expr_node.find_all((exp.Sum, exp.Count, exp.Avg, exp.Min, exp.Max)))
-            if aggregations or (alias and alias in metric_names_global):
-                continue
-            
-            # Skip '*' (star) expressions
-            if isinstance(expr_node, exp.Star):
-                continue
-            
-            # Skip constants/literals
-            if is_constant_or_literal(expr_node):
-                continue
-            
-            # Only include simple column references (not complex expressions)
-            if not is_simple_column_reference(expr_node):
-                continue
-            
-            # Get dimension name - prefer alias, fallback to column name
-            dim_name = alias or extract_column_name_from_expression(expr_node)
-            
-            # Normalize: check if the underlying column (without alias) is already in group_by_cols
-            underlying_col = extract_column_name_from_expression(expr_node)
-            if underlying_col in group_by_cols:
-                continue
-            
-            if dim_name and dim_name != '*' and dim_name not in metric_names_global:
-                _add_role(dim_name, "select_only", "select_only")
-    
-    # 4. Metrics (Aggregates) - Extract FIRST so we can exclude them from dimensions
-    # Extract metrics from CTEs first (where most aggregations happen)
-    # Then extract from main SELECT
-    def extract_metrics_from_select(select_stmt: exp.Select, cte_name: str = None):
-        """Helper function to extract metrics from a SELECT statement (CTE or main)"""
-        if not isinstance(select_stmt, exp.Select):
-            return
-        
         for i, expression in enumerate(select_stmt.expressions):
-            alias = expression.alias_or_name
-            if not alias:
-                alias = f"metric_{i}" 
-            
-            # Use expression as exp_obj for consistency with the provided snippet
-            exp_obj = expression
-
-            # Get alias and real expression
-            m_name = exp_obj.alias_or_name
-            if not m_name:
-                m_name = f"metric_{i}" # Fallback if no alias
-
-            # The expression itself, unaliased if it was an alias
-            m_expr_node = exp_obj.this if isinstance(exp_obj, exp.Alias) else exp_obj
+            m_name = expression.alias_or_name or f"metric_{i}"
+            m_expr_node = expression.this if isinstance(expression, exp.Alias) else expression
             m_expr = m_expr_node.sql()
 
-            # Track columns referenced inside metric expression so they are not pruned
             for col_ref in m_expr_node.find_all(exp.Column):
                 col_name = col_ref.alias_or_name or col_ref.sql()
                 if col_name:
                     metric_ref_columns.add(col_name)
-            
-            # Find aggregations recursively in the expression (handles nested cases)
+
             aggregations = list(m_expr_node.find_all((exp.Sum, exp.Count, exp.Avg, exp.Min, exp.Max)))
-            
-            # Inference: Metric Type
             m_type = "aggregate"
             numerator = ""
             denominator = ""
-            
+
             if "/" in m_expr or "DIV" in m_expr.upper():
                 m_type = "ratio"
-                # Naive split for demo
                 if "/" in m_expr:
                     parts = m_expr.split("/")
                     if len(parts) == 2:
                         numerator = parts[0].strip()
                         denominator = parts[1].strip()
-            
-            # Inference: Time Dimension
-            # Scan dimensions for date-like things
-            time_dim = ""
-            for d in dimensions:
-                if "date" in d.lower() or "time" in d.lower() or "month" in d.lower() or "year" in d.lower():
-                    time_dim = d
-                    break
-            
-            # Inference: Aggregation from sqlglot
-            # Check if expression itself is an aggregation OR contains aggregations
+
             agg_type = "custom"
             if aggregations:
-                # Use the first aggregation found to determine type
                 first_agg = aggregations[0]
                 if isinstance(first_agg, exp.Sum): agg_type = "sum"
                 elif isinstance(first_agg, exp.Count): agg_type = "count"
@@ -501,148 +730,41 @@ def extract_metadata(sql: str, model_name: str, config: Optional[Config] = None)
             elif isinstance(m_expr_node, exp.Avg): agg_type = "avg"
             elif isinstance(m_expr_node, exp.Min): agg_type = "min"
             elif isinstance(m_expr_node, exp.Max): agg_type = "max"
-            
-            # Only add as a metric if it's an aggregate or ratio
-            if m_type == "ratio" or agg_type != "custom":
-                # Check if metric already exists (avoid duplicates)
-                metric_exists = any(m.get("name") == m_name for m in metrics)
-                if not metric_exists:
-                    metric_names_global.add(m_name)  # Track metric name
-                    # Determine source table - use model name, not CTE alias
-                    # CTEs are intermediate results, the actual table is the model itself
-                    source_table = model_name  # Use the actual model name, not CTE alias
-                    metrics.append({
-                        "name": m_name,
-                        "expression": m_expr,
-                        "model": model_name,  # Ensure model is set
-                        "source_table": source_table,  # Set to model name, not CTE alias
-                        "grain": grain,
-                        "metric_type": m_type,
-                        "aggregation": agg_type,
-                        "default_dimensions": [], # Configurable manually ideally
-                        "default_filter": "",
-                        "time_dimension": time_dim,
-                        "depends_on": [], # Logic for derived metrics needing AST analysis
-                        "numerator": numerator,
-                        "denominator": denominator,
-                        "semi_additive_method": "",
-                        "semi_additive_dimension": "",
-                        "tags": [],
-                        "description": ""
-                    })
-    
-    # Extract metrics FIRST (before dimensions) so we can exclude them
+
+            if (m_type == "ratio" and aggregations) or agg_type != "custom":
+                if any(m.get("name") == m_name for m in metrics):
+                    continue
+                metric_names_global.add(m_name)
+                metrics.append({
+                    "name": m_name,
+                    "expression": m_expr,
+                    "model": model_name,
+                    "source_table": model_name,
+                    "grain": grain_columns,
+                    "metric_type": m_type,
+                    "aggregation": agg_type,
+                    "default_dimensions": [],
+                    "default_filter": "",
+                    "time_dimension": "",
+                    "depends_on": [],
+                    "numerator": numerator,
+                    "denominator": denominator,
+                    "semi_additive_method": "",
+                    "semi_additive_dimension": "",
+                    "tags": [],
+                    "description": ""
+                })
+
     if isinstance(main_select, exp.Select):
-        # Extract from CTEs first (where aggregations typically happen)
         if main_select.ctes:
             for cte in main_select.ctes:
                 if isinstance(cte.this, exp.Select):
-                    extract_metrics_from_select(cte.this, cte.alias)
-        
-        # Also extract metrics from main SELECT (in case there are aggregations there too)
+                    extract_metrics_from_select(cte.this)
         extract_metrics_from_select(main_select)
-    
-    # 3. Dimensions Extraction (Priority Order) - AFTER metrics so we can exclude them
-    # Extract dimensions from all SELECT statements (main + CTEs)
-    # First pass: Extract GROUP BY columns from all SELECTs
-    group_by_cols = set()
-    if isinstance(main_select, exp.Select):
-        extract_dimensions_from_group_by(main_select)
-        # Collect GROUP BY column names for filtering SELECT columns
-        group = main_select.find(exp.Group)
-        if group:
-            for expr in group.expressions:
-                col_name = extract_column_name_from_expression(expr)
-                if col_name:
-                    group_by_cols.add(col_name)
-        
-        # Also check CTEs
-        if main_select.ctes:
-            for cte in main_select.ctes:
-                if isinstance(cte.this, exp.Select):
-                    extract_dimensions_from_group_by(cte.this)
-                    group = cte.this.find(exp.Group)
-                    if group:
-                        for expr in group.expressions:
-                            col_name = extract_column_name_from_expression(expr)
-                            if col_name:
-                                group_by_cols.add(col_name)
-    
-    # Second pass: Extract WHERE clause columns
-    if isinstance(main_select, exp.Select):
-        extract_dimensions_from_where(main_select)
-        if main_select.ctes:
-            for cte in main_select.ctes:
-                if isinstance(cte.this, exp.Select):
-                    extract_dimensions_from_where(cte.this)
-    
-    # Third pass: Extract from SELECT columns (filtered)
-    if isinstance(main_select, exp.Select):
-        extract_dimensions_from_select(main_select, group_by_cols)
-        if main_select.ctes:
-            for cte in main_select.ctes:
-                if isinstance(cte.this, exp.Select):
-                    extract_dimensions_from_select(cte.this, group_by_cols)
 
-    # Add metric reference roles after metric parsing
-    for col in metric_ref_columns:
-        _add_role(col, "metric_ref", "metric_ref")
-
-    # Mark grain (entity pk) if available
-    if entity.get("pk"):
-        _add_role(entity["pk"], "grain", "grain")
-
-    # Apply user keep/drop overrides to candidate list
-    for keep_dim in keep_overrides:
-        _add_role(keep_dim, "user_keep", "user_keep")
-    # Drop overrides handled in pruning step
-
-    dimension_details = []
-    for dim_name, roles in dim_roles.items():
-        roles_set = set(roles)
-        included = False
-        reason = "pruned"
-
-        if dim_name in drop_overrides:
-            included = False
-            reason = "drop_override"
-        elif dim_name in keep_overrides:
-            included = True
-            roles_set.add("user_keep")
-            reason = "user_keep"
-        elif "group_by" in roles_set:
-            included = True
-            reason = "group_by"
-        elif "where_filter" in roles_set:
-            included = True
-            reason = "where_filter"
-        elif "join_key" in roles_set:
-            included = True
-            reason = "join_key"
-        elif "grain" in roles_set:
-            included = True
-            reason = "grain"
-        elif "metric_ref" in roles_set:
-            included = True
-            reason = "metric_ref"
-        else:
-            included = False
-            reason = "pruned"
-
-        if included:
-            dimensions.append(dim_name)
-
-        dim_detail = {
-            "name": dim_name,
-            "included": included,
-            "reason": reason,
-            "roles": sorted(list(roles_set))
-        }
-        dimension_details.append(dim_detail)
-
-        if debug:
-            log_reason = reason
-            logger.debug(f"Dimension {'kept' if included else 'pruned'}: {dim_name} (reason: {log_reason})")
+    # Entity pk: only accept single-column clear grain
+    if grain_status == "clear" and len(grain_columns) == 1:
+        entity["pk"] = grain_columns[0]
 
     return {
         "model": model_name,
@@ -652,5 +774,12 @@ def extract_metadata(sql: str, model_name: str, config: Optional[Config] = None)
         "filters": filters,
         "source_tables": source_tables,
         "entity": entity,
-        "relationships": relationships
+        "relationships": relationships,
+        "grain_status": grain_status,
+        "grain_detection": grain_detection,
+        "grain_columns": grain_columns,
+        "semantic_intent": semantic_intent,
+        "semantic_node": semantic_node,
+        "grain_scope": grain_scope,
+        "grain_reasons": grain_reasons
     }

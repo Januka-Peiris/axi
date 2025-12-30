@@ -21,7 +21,7 @@ except ImportError:
 
 class PostgreSQLAdapter(DatabaseAdapter):
     """PostgreSQL database adapter with connection pooling."""
-    
+
     def __init__(
         self,
         host: str = "localhost",
@@ -31,11 +31,12 @@ class PostgreSQLAdapter(DatabaseAdapter):
         password: str = "",
         connection_pool_min: int = 1,
         connection_pool_max: int = 10,
-        db_url: Optional[str] = None
+        db_url: Optional[str] = None,
+        schema: Optional[str] = None
     ):
         """
         Initialize PostgreSQL adapter.
-        
+
         Args:
             host: Database host
             port: Database port
@@ -45,17 +46,19 @@ class PostgreSQLAdapter(DatabaseAdapter):
             connection_pool_min: Minimum pool size
             connection_pool_max: Maximum pool size
             db_url: Alternative connection string (overrides other params)
+            schema: PostgreSQL schema for multi-tenancy (creates if not exists)
         """
         if not PSYCOPG2_AVAILABLE:
             raise ImportError(
                 "psycopg2 is required for PostgreSQL support. "
                 "Install it with: pip install psycopg2-binary"
             )
-        
+
         self.connection_pool: Optional[pool.ThreadedConnectionPool] = None
         self.current_conn: Optional[Any] = None
         self.current_cursor: Optional[Any] = None
-        
+        self.schema = schema
+
         if db_url:
             # Parse connection string
             self._init_from_url(db_url, connection_pool_min, connection_pool_max)
@@ -64,6 +67,10 @@ class PostgreSQLAdapter(DatabaseAdapter):
                 host, port, database, user, password,
                 connection_pool_min, connection_pool_max
             )
+
+        # Initialize schema if specified
+        if self.schema:
+            self._init_schema()
     
     def _init_from_url(self, db_url: str, pool_min: int, pool_max: int) -> None:
         """Initialize connection pool from URL."""
@@ -97,12 +104,44 @@ class PostgreSQLAdapter(DatabaseAdapter):
             )
         except Exception as e:
             raise ConnectionError(f"Failed to create PostgreSQL connection pool: {e}")
-    
-    def _get_connection(self):
-        """Get a connection from the pool."""
+
+    def _init_schema(self) -> None:
+        """Create schema if it doesn't exist and set search_path."""
+        if not self.schema:
+            return
+        conn = self._get_connection_raw()
+        try:
+            cursor = conn.cursor()
+            # Create schema if not exists
+            cursor.execute(
+                sql.SQL("CREATE SCHEMA IF NOT EXISTS {}").format(
+                    sql.Identifier(self.schema)
+                )
+            )
+            conn.commit()
+            cursor.close()
+        finally:
+            self._return_connection(conn)
+
+    def _get_connection_raw(self):
+        """Get a raw connection from the pool without setting schema."""
         if self.connection_pool is None:
             raise RuntimeError("Connection pool not initialized")
         return self.connection_pool.getconn()
+
+    def _get_connection(self):
+        """Get a connection from the pool and set schema if specified."""
+        conn = self._get_connection_raw()
+        # Set search_path to use the specified schema
+        if self.schema:
+            cursor = conn.cursor()
+            cursor.execute(
+                sql.SQL("SET search_path TO {}, public").format(
+                    sql.Identifier(self.schema)
+                )
+            )
+            cursor.close()
+        return conn
     
     def _return_connection(self, conn) -> None:
         """Return a connection to the pool."""

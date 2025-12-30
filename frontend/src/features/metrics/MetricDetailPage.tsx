@@ -16,11 +16,10 @@ import {
   MetricBuilder,
   DeleteConfirmModal,
 } from './components';
-import { LocalSubgraph } from '../../components/graph/LocalSubgraph';
 import { LineageView } from '../../components/LineageView';
-import { DataQualityIndicators } from '../../components/DataQualityIndicators';
 import { Comments } from '../../components/Comments';
 import { VersionHistory } from '../../components/VersionHistory';
+import { GlossaryTermList } from '../../components/glossary/GlossaryTermList';
 
 export const MetricDetailPage: React.FC = () => {
   const { metricId } = useParams<{ metricId: string }>();
@@ -172,16 +171,6 @@ export const MetricDetailPage: React.FC = () => {
         <LineageView metricName={metric.name} />
       </div>
 
-      {/* Local Subgraph */}
-      <div className="space-y-4">
-        <h2 className="text-xl font-bold text-white">Graph View</h2>
-        <LocalSubgraph
-          nodeId={`metric.${metric.name}`}
-          depth={1}
-          height="400px"
-        />
-      </div>
-
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Content */}
@@ -235,18 +224,6 @@ export const MetricDetailPage: React.FC = () => {
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Data Quality */}
-          <DataQualityIndicators
-            entityType="metric"
-            entityData={{
-              name: metric.name,
-              expression: metric.expression,
-              entity: metric.entity_name || metric.entity,
-              dimensions: metric.default_dimensions,
-              type: metric.type
-            }}
-          />
-
           {/* Metadata */}
           <div className="p-6 rounded-xl bg-[#151821] border border-white/10 space-y-4">
             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">
@@ -314,6 +291,9 @@ export const MetricDetailPage: React.FC = () => {
             entityType="metric"
             entityId={metric.name}
           />
+
+          {/* Glossary */}
+          <GlossaryTermList linkedMetric={metric.name} linkedEntity={metric.entity_name || metric.entity || undefined} />
         </div>
       </div>
 

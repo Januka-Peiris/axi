@@ -1,0 +1,49 @@
+
+=====================================================================
+  AXI OSS has been deployed successfully!
+=====================================================================
+
+{{- if .Values.ingress.enabled }}
+
+Your AXI instance is available at:
+
+  API:      https://{{ .Values.ingress.apiHost }}
+  Frontend: https://{{ .Values.ingress.frontendHost }}
+
+{{- else }}
+
+To access AXI, set up port forwarding:
+
+  API:
+    kubectl port-forward svc/{{ include "axi-oss.fullname" . }}-api {{ .Values.service.port }}:{{ .Values.service.port }}
+    Then open: http://localhost:{{ .Values.service.port }}
+
+  Frontend:
+    kubectl port-forward svc/{{ include "axi-oss.fullname" . }}-frontend {{ .Values.service.frontendPort }}:{{ .Values.service.frontendPort }}
+    Then open: http://localhost:{{ .Values.service.frontendPort }}
+
+{{- end }}
+
+Health Check:
+  curl http://localhost:{{ .Values.service.port }}/health
+
+Storage Mode: {{ .Values.config.storage }}
+
+{{- if eq .Values.config.storage "sqlite" }}
+
+Data is stored in SQLite at: {{ .Values.config.metadataDir }}
+
+{{- else if eq .Values.config.storage "postgres" }}
+
+Data is stored in PostgreSQL.
+
+{{- end }}
+
+Getting Started:
+
+1. Access the frontend UI to explore your metrics
+2. Configure your Snowflake connection in the settings
+3. Run `axi extract` to discover metrics from your dbt project
+
+For more information, see the documentation:
+  https://github.com/your-org/axi

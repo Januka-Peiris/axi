@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "axi-oss.fullname" . }}-config
+  labels:
+    {{- include "axi-oss.labels" . | nindent 4 }}
+data:
+  # Application settings
+  LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  AXI_STORAGE: {{ .Values.config.storage | quote }}
+  AXI_METADATA_DIR: {{ .Values.config.metadataDir | quote }}
+
+  # Snowflake settings (if configured)
+  {{- if .Values.config.snowflake.account }}
+  SNOWFLAKE_ACCOUNT: {{ .Values.config.snowflake.account | quote }}
+  {{- end }}
+  {{- if .Values.config.snowflake.user }}
+  SNOWFLAKE_USER: {{ .Values.config.snowflake.user | quote }}
+  {{- end }}
+  {{- if .Values.config.snowflake.warehouse }}
+  SNOWFLAKE_WAREHOUSE: {{ .Values.config.snowflake.warehouse | quote }}
+  {{- end }}
+  {{- if .Values.config.snowflake.database }}
+  SNOWFLAKE_DATABASE: {{ .Values.config.snowflake.database | quote }}
+  {{- end }}
+  {{- if .Values.config.snowflake.schema }}
+  SNOWFLAKE_SCHEMA: {{ .Values.config.snowflake.schema | quote }}
+  {{- end }}

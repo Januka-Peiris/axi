@@ -1,0 +1,272 @@
+# AXI OSS Helm Chart Values
+# Default configuration for AXI Open Source deployment
+
+# -- Global settings
+global:
+  imagePullSecrets: []
+  storageClass: ""
+
+# -- Namespace to deploy into
+namespace: ""
+
+# =============================================================================
+# API Configuration
+# =============================================================================
+api:
+  # -- Enable API deployment
+  enabled: true
+
+  # -- Number of API replicas
+  replicaCount: 1
+
+  # -- API image configuration
+  image:
+    repository: ghcr.io/your-org/axi-oss
+    tag: ""
+    pullPolicy: IfNotPresent
+
+  # -- API container port
+  port: 8000
+
+  # -- Resource limits and requests
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 250m
+      memory: 512Mi
+
+  # -- Liveness probe
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: http
+    initialDelaySeconds: 15
+    periodSeconds: 10
+
+  # -- Readiness probe
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+
+  # -- Node selector
+  nodeSelector: {}
+
+  # -- Tolerations
+  tolerations: []
+
+  # -- Affinity
+  affinity: {}
+
+  # -- Auto-scaling
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+
+# =============================================================================
+# Frontend Configuration
+# =============================================================================
+frontend:
+  # -- Enable frontend deployment
+  enabled: true
+
+  # -- Number of frontend replicas
+  replicaCount: 1
+
+  # -- Frontend image configuration
+  image:
+    repository: ghcr.io/your-org/axi-oss-frontend
+    tag: ""
+    pullPolicy: IfNotPresent
+
+  # -- Frontend container port
+  port: 80
+
+  # -- Resource limits and requests
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+  # -- Node selector
+  nodeSelector: {}
+
+  # -- Tolerations
+  tolerations: []
+
+  # -- Affinity
+  affinity: {}
+
+# =============================================================================
+# Service Configuration
+# =============================================================================
+service:
+  # -- API service type
+  type: ClusterIP
+  # -- API service port
+  port: 8000
+  # -- Frontend service type
+  frontendType: ClusterIP
+  # -- Frontend service port
+  frontendPort: 80
+
+# =============================================================================
+# Ingress Configuration
+# =============================================================================
+ingress:
+  # -- Enable ingress
+  enabled: false
+
+  # -- Ingress class name
+  className: nginx
+
+  # -- Ingress annotations
+  annotations: {}
+    # kubernetes.io/tls-acme: "true"
+
+  # -- API ingress host
+  apiHost: api.axi.local
+
+  # -- Frontend ingress host
+  frontendHost: axi.local
+
+  # -- TLS configuration
+  tls: []
+
+# =============================================================================
+# Application Configuration
+# =============================================================================
+config:
+  # -- Log level (DEBUG, INFO, WARNING, ERROR)
+  logLevel: INFO
+
+  # -- Storage backend (sqlite or postgres)
+  storage: sqlite
+
+  # -- Metadata directory path (for SQLite storage)
+  metadataDir: /app/data
+
+  # -- Snowflake configuration (optional)
+  snowflake:
+    # -- Snowflake account identifier
+    account: ""
+    # -- Snowflake username
+    user: ""
+    # -- Snowflake warehouse
+    warehouse: ""
+    # -- Snowflake database
+    database: ""
+    # -- Snowflake schema
+    schema: ""
+
+# =============================================================================
+# Secrets Configuration
+# =============================================================================
+secrets:
+  # -- Use existing secret
+  existingSecret: ""
+
+  # -- Snowflake password (if not using existing secret)
+  snowflakePassword: ""
+
+  # -- Snowflake private key (for key-pair auth)
+  snowflakePrivateKey: ""
+
+# =============================================================================
+# PostgreSQL Configuration
+# =============================================================================
+postgresql:
+  # -- Enable built-in PostgreSQL (for postgres storage)
+  enabled: false
+
+  # -- PostgreSQL authentication
+  auth:
+    username: axi
+    password: ""
+    database: axi
+    existingSecret: ""
+
+  # -- PostgreSQL persistence
+  primary:
+    persistence:
+      enabled: true
+      size: 10Gi
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 256Mi
+
+# -- External PostgreSQL (used when postgresql.enabled=false and config.storage=postgres)
+externalPostgresql:
+  host: ""
+  port: 5432
+  username: axi
+  password: ""
+  database: axi
+  existingSecret: ""
+
+# =============================================================================
+# Persistence Configuration
+# =============================================================================
+persistence:
+  # -- Enable persistent storage for metadata
+  enabled: true
+
+  # -- Storage class
+  storageClass: ""
+
+  # -- Access mode
+  accessMode: ReadWriteOnce
+
+  # -- Storage size
+  size: 5Gi
+
+  # -- Existing PVC
+  existingClaim: ""
+
+# =============================================================================
+# Service Account
+# =============================================================================
+serviceAccount:
+  create: true
+  automount: true
+  annotations: {}
+  name: ""
+
+# =============================================================================
+# Pod Configuration
+# =============================================================================
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  fsGroup: 1000
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+# =============================================================================
+# Monitoring
+# =============================================================================
+monitoring:
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+    labels: {}

@@ -1,0 +1,101 @@
+{
+  "model": "mart_geographic_performance",
+  "metrics": [],
+  "dimensions": [],
+  "dimension_details": [],
+  "filters": [
+    "NOT city_name IS NULL /* Only include locations with valid geography */"
+  ],
+  "source_tables": [
+    "final",
+    "dim_customers",
+    "dim_geography",
+    "customer_geography",
+    "fct_sales_invoices",
+    "stg__sales__invoicelines",
+    "mart_customer_analysis",
+    "sales_by_geography",
+    "geographic_performance",
+    "country_summary",
+    "state_summary"
+  ],
+  "entity": {
+    "name": "mart_geographic_performance",
+    "pk": null,
+    "columns": []
+  },
+  "relationships": [
+    {
+      "parent_model": "dim_customers",
+      "child_model": "mart_geographic_performance",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "dim_geography",
+      "child_model": "mart_geographic_performance",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "fct_sales_invoices",
+      "child_model": "mart_geographic_performance",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "stg__sales__invoicelines",
+      "child_model": "mart_geographic_performance",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "mart_customer_analysis",
+      "child_model": "mart_geographic_performance",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "dim_geography",
+      "child_model": "dim_customers",
+      "fk_column": "delivery_city_name",
+      "pk_column": "city_name",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "mart_customer_analysis",
+      "child_model": "customer_geography",
+      "fk_column": "customer_id",
+      "pk_column": "customer_id",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "country_summary",
+      "child_model": "geographic_performance",
+      "fk_column": "country_name",
+      "pk_column": "country_name",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "country_summary",
+      "child_model": "mart_geographic_performance",
+      "fk_column": "country_name",
+      "pk_column": "country_name",
+      "join_type": "INNER"
+    }
+  ],
+  "grain_status": "ambiguous",
+  "grain_detection": "none",
+  "grain_columns": [],
+  "semantic_intent": "aggregation_like",
+  "semantic_node": "unknown",
+  "grain_scope": "cte",
+  "grain_reasons": [
+    "multiple grouped CTE sources detected without regrouping"
+  ]
+}

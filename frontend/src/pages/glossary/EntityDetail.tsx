@@ -4,7 +4,6 @@ import { useGlossaryEntity } from '../../api/glossary';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import { EntityAttributeTable } from '../../components/glossary/EntityAttributeTable';
 import { RelationshipGraph } from '../../components/glossary/RelationshipGraph';
-import { LocalSubgraph } from '../../components/graph/LocalSubgraph';
 
 export const EntityDetail: React.FC = () => {
     const { name } = useParams<{ name: string }>();
@@ -48,16 +47,6 @@ export const EntityDetail: React.FC = () => {
                     <div className="text-xs text-slate-500 uppercase tracking-wider font-bold mb-1">Relationships</div>
                     <div className="font-mono text-white">{entity.relationships.length}</div>
                 </div>
-            </div>
-
-            {/* Local Subgraph */}
-            <div className="space-y-4">
-                <h2 className="text-xl font-bold text-white">Graph View</h2>
-                <LocalSubgraph 
-                    nodeId={`entity.${entity.name}`} 
-                    depth={1}
-                    height="400px"
-                />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

@@ -20,11 +20,16 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage').then(m => ({ defa
 const GraphExplore = lazy(() => import('./pages/GraphExplore').then(m => ({ default: m.GraphExplore })));
 const GraphExplorer = lazy(() => import('./pages/GraphExplorer').then(m => ({ default: m.GraphExplorer })));
 const MetricCompare = lazy(() => import('./pages/MetricCompare').then(m => ({ default: m.MetricCompare })));
+const GlossaryHome = lazy(() => import('./pages/glossary/GlossaryHome').then(m => ({ default: m.GlossaryHome })));
+const GlossaryEntityList = lazy(() => import('./pages/glossary/EntityList').then(m => ({ default: m.EntityList })));
+const GlossaryEntityDetail = lazy(() => import('./pages/glossary/EntityDetail').then(m => ({ default: m.EntityDetail })));
+const GlossaryMetricView = lazy(() => import('./pages/glossary/MetricView').then(m => ({ default: m.MetricView })));
+const GlossaryDimensionView = lazy(() => import('./pages/glossary/DimensionView').then(m => ({ default: m.DimensionView })));
+const GlossaryTermView = lazy(() => import('./pages/glossary/GlossaryTermView').then(m => ({ default: m.GlossaryTermView })));
 
 // Use HashRouter for simpler local file execution if needed, but BrowserRouter is fine for Vite
 // Using HashRouter ensures reloading works easily without server config for SPA
 export default function App() {
-  const isDebug = import.meta.env.VITE_AXI_DEBUG === '1' || import.meta.env.VITE_AXI_DEBUG === 'true';
   return (
     <ErrorBoundary>
       <HashRouter>
@@ -53,6 +58,14 @@ export default function App() {
               {/* Docs Routes */}
               <Route path="/docs" element={<DocsPage />} />
               <Route path="/docs/:slug" element={<DocsPage />} />
+
+              {/* Glossary */}
+              <Route path="/glossary" element={<GlossaryHome />} />
+              <Route path="/glossary/entities" element={<GlossaryEntityList />} />
+              <Route path="/glossary/entity/:name" element={<GlossaryEntityDetail />} />
+              <Route path="/glossary/metric/:name" element={<GlossaryMetricView />} />
+              <Route path="/glossary/dimension/:name" element={<GlossaryDimensionView />} />
+              <Route path="/glossary/term/:term" element={<GlossaryTermView />} />
 
               {/* Settings */}
               <Route path="/settings" element={<SettingsPage />} />

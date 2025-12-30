@@ -11,7 +11,7 @@ from axi.metadata.indexer import MetadataIndexer
 from axi.query.engine import SemanticQueryEngine
 from axi.execution.snowflake_runner import SnowflakeRunner
 from axi.utils.logging_config import get_logger
-from axi.utils.sanitization import validate_metric_name, sanitize_identifier
+from axi.utils.sanitization import validate_metric_name, validate_dimension_name, sanitize_identifier
 
 logger = get_logger(__name__)
 
@@ -84,69 +84,61 @@ class Materializer:
             "message": "Materialization completed with full refresh"
         }
 
-    def create_mart(self, mart_name: str, metrics: List[str], dimensions: List[str]):
+    def create_mart(self, mart_name: str, metrics: List[str], dimensions: List[str]) -> Dict[str, Any]:
         """
         Creates a wide table with multiple metrics joined on dimensions.
+
+        Uses a CTE approach where each metric query becomes a CTE, then all CTEs
+        are joined on the shared dimensions to produce a single wide table.
         """
+        # Validate inputs
+        if not metrics:
+            raise ValueError("At least one metric is required")
+        if not dimensions:
+            raise ValueError("At least one dimension is required")
+
+        metrics = [validate_metric_name(m) for m in metrics]
+        dimensions = [validate_dimension_name(d) for d in dimensions]
+
         table_name = f"axi__mart__{self._slugify(mart_name)}"
-        
-        # Generate SQL for each metric
-        # Join them on dimensions
-        # CTE approach
-        
-        ctes = []
-        selects = list(dimensions)
-        joins = []
-        
-        base_cte = f"base_{metrics[0]}"
-        
-        # We need to align them.
-        # This is complex semantic layer logic ("Stitching").
-        # Simplified: Assume all metrics share the exact same grain/dims and joins are trivial on those dims.
-        
-        # Construct a query that joins valid metric subqueries.
-        # Or better: `SELECT dims, metric1, metric2...` from source if they are on same source?
-        # Likely they are not.
-        
-        # MVP: Generate SQL for each, putting them in CTEs, then joining on dims.
-        
-        master_sql = "WITH "
+        base_cte = f"m_0_{self._slugify(metrics[0])}"
+
+        # Build CTEs for each metric
         cte_defs = []
+        joins = []
+
         for i, m in enumerate(metrics):
             m_sql = self.engine.generate_sql(m, dimensions, [], dialect="snowflake")
-            # We need to strip the semicolon
             m_sql = m_sql.strip().rstrip(';')
-            cte_name = f"m_{i}_{m}"
-            cte_defs.append(f"{cte_name} AS ({m_sql})")
-            
-            if i == 0:
-                pass # Base
-            else:
-                 # Join condition
-                 on_clauses = [f"m_0_{metrics[0]}.{d} = {cte_name}.{d}" for d in dimensions]
-                 joins.append(f"LEFT JOIN {cte_name} ON {' AND '.join(on_clauses)}")
-            
-            selects.append(f"{cte_name}.{m} as {m}")
-            
-        master_sql += ",\n".join(cte_defs)
-        master_sql += f"\nSELECT {', '.join(dimensions)}, {', '.join([f'{m}' for m in metrics])} FROM m_0_{metrics[0]}" # Simplified projection
-        # Actually need to project from respective CTEs in SELECT list
-        
-        # Re-do Selects properly
-        # Dims from first CTE
-        final_selects = [f"m_0_{metrics[0]}.{d}" for d in dimensions]
-        # Metrics from their CTEs
+            cte_name = f"m_{i}_{self._slugify(m)}"
+            cte_defs.append(f"{cte_name} AS (\n{m_sql}\n)")
+
+            # Build join clauses for non-base CTEs
+            if i > 0:
+                on_clauses = [f"{base_cte}.{d} = {cte_name}.{d}" for d in dimensions]
+                joins.append(f"LEFT JOIN {cte_name} ON {' AND '.join(on_clauses)}")
+
+        # Build SELECT list: dimensions from base CTE, metrics from their respective CTEs
+        select_cols = [f"{base_cte}.{d}" for d in dimensions]
         for i, m in enumerate(metrics):
-            final_selects.append(f"m_{i}_{m}.{m}")
-            
-        master_sql += f"\nSELECT {', '.join(final_selects)} FROM m_0_{metrics[0]}"
-        
+            cte_name = f"m_{i}_{self._slugify(m)}"
+            select_cols.append(f"{cte_name}.{m}")
+
+        # Assemble final SQL
+        master_sql = "WITH " + ",\n".join(cte_defs)
+        master_sql += f"\nSELECT {', '.join(select_cols)}\nFROM {base_cte}"
         if joins:
             master_sql += "\n" + "\n".join(joins)
-            
+
         ddl = f"CREATE OR REPLACE TABLE {table_name} AS {master_sql}"
+
+        logger.info(f"Creating mart table: {table_name}")
+        logger.debug(f"Mart DDL: {ddl}")
+
         self.runner.execute_query(ddl)
-        
+
         # Register Mart
         self.indexer.record_mart(mart_name, metrics, dimensions, table_name)
-        return {"mart": mart_name, "table": table_name}
+
+        logger.info(f"Successfully created mart: {mart_name}")
+        return {"mart": mart_name, "table": table_name, "metrics": metrics, "dimensions": dimensions}

@@ -20,6 +20,12 @@ router = APIRouter(prefix="/api/query", tags=["query"])
 settings = get_settings()
 logger = get_logger(__name__)
 
+
+class SqlRunnerContextRequest(BaseModel):
+    metrics: List[str] = []
+    entities: List[str] = []
+    dimensions: List[str] = []
+
 def _get_indexer():
     return MetadataIndexer(settings.metadata_dir)
 
@@ -61,6 +67,21 @@ def _validate_metrics(engine: SemanticQueryEngine, metric_names: List[str]) -> L
             )
         validated.append(metric)
     return validated
+
+@router.post("/sqlrunner/context")
+def sqlrunner_context(req: SqlRunnerContextRequest):
+    """
+    Return allowed next selections for SQL Runner: compatible metrics, dimensions, and joinable entities.
+    """
+    indexer = _get_indexer()
+    engine = SemanticQueryEngine(indexer)
+    try:
+        return engine.plan_sqlrunner_context(req.metrics, req.entities)
+    except QueryError as e:
+        raise HTTPException(status_code=400, detail=e.to_dict())
+    except Exception as e:
+        logger.error(f"Context planning error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
 
 def _build_filter_strings(filters: List[FilterItem]) -> List[str]:
     """Convert filter objects to SQL filter strings."""
@@ -437,8 +458,7 @@ def get_query_plan(req: SemanticQueryRequest):
 @router.post("/semantic/reachable-dimensions")
 def get_reachable_dimensions(req: SemanticQueryRequest):
     """
-    Get reachable dimensions for the given metrics.
-    Returns a flat list of dimension names that can be joined to the metrics.
+    Get reachable dimensions for the given metrics (grain-safe, fan-out-safe).
     """
     logger.debug(f"Getting reachable dimensions for metrics: {req.metrics}")
     indexer = _get_indexer()
@@ -447,25 +467,22 @@ def get_reachable_dimensions(req: SemanticQueryRequest):
     try:
         validated_metrics = _validate_metrics(engine, req.metrics)
         
-        # Collect all reachable dimensions across all metrics
-        all_reachable_dims = set()
-        
+        all_visible = []
+        all_excluded = []
         for metric in validated_metrics:
             metric_name = metric['name']
             reachable = engine.get_reachable_dimensions(metric_name)
-            
-            # Flatten the reachable dimensions (they're grouped by model)
-            for model_name, dims in reachable.items():
-                for dim in dims:
-                    if isinstance(dim, str):
-                        all_reachable_dims.add(dim)
-                    elif isinstance(dim, dict):
-                        dim_name = dim.get('name') or dim.get('dimension_name')
-                        if dim_name:
-                            all_reachable_dims.add(dim_name)
-        
+            for dim in reachable.get("visible_dimensions", []):
+                all_visible.append(dim)
+            for dim in reachable.get("excluded_dimensions", []):
+                all_excluded.append(dim)
+
+        # Legacy flat list for compatibility
+        flat_dims = sorted({d["name"] for d in all_visible if d.get("name")})
         return {
-            "dimensions": sorted(list(all_reachable_dims)),
+            "visible_dimensions": all_visible,
+            "excluded_dimensions": all_excluded,
+            "dimensions": flat_dims,
             "generated_at": datetime.utcnow().isoformat()
         }
     except HTTPException:

@@ -43,16 +43,16 @@ export const SettingsPage = () => {
             setApiInfo(res.data);
             setHealth(prev => ({ ...prev, api: 'connected' }));
 
-            // Check Snowflake from health response
-            if (res.data.snowflake_available === false) {
-                setHealth(prev => ({ ...prev, snowflake: 'not_configured' }));
-            } else if (res.data.snowflake_available === true) {
+            // Support both old `snowflake` and new `snowflake_available` keys
+            const snowflakeAvailable = res.data.snowflake_available ?? res.data.snowflake;
+            if (snowflakeAvailable === true) {
                 setHealth(prev => ({ ...prev, snowflake: 'connected' }));
+            } else if (snowflakeAvailable === false) {
+                setHealth(prev => ({ ...prev, snowflake: 'disconnected' }));
             } else {
-                // Try to infer from response
                 setHealth(prev => ({ ...prev, snowflake: 'not_configured' }));
             }
-        } catch (err) {
+        } catch {
             setHealth({ api: 'disconnected', snowflake: 'disconnected' });
         }
     };

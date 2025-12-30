@@ -11,10 +11,6 @@ export const CategoryGraph = () => {
     const [error, setError] = useState<string | null>(null);
     const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
-    useEffect(() => {
-        loadCategories();
-    }, []);
-
     const loadCategories = () => {
         setLoading(true);
         setError(null);
@@ -42,6 +38,10 @@ export const CategoryGraph = () => {
                 setLoading(false);
             });
     };
+
+    useEffect(() => {
+        loadCategories();
+    }, []);
 
     const handleCategoryClick = async (nodeId: string, node: VisGraphNode) => {
         const categoryType = node.categoryType || '';

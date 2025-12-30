@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import type { ElementType, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Search,
@@ -22,7 +23,7 @@ interface CommandItem {
     id: string;
     title: string;
     subtitle?: string;
-    icon: React.ElementType;
+    icon: ElementType;
     category: 'navigation' | 'action' | 'recent' | 'search';
     action: () => void;
     keywords?: string[];
@@ -58,7 +59,7 @@ export const CommandPalette = ({ metrics = [], dimensions = [] }: CommandPalette
             setRecentPages(updated);
             localStorage.setItem('axi_recent_pages', JSON.stringify(updated));
         }
-    }, []);
+    }, [recentPages]);
 
     // Base navigation commands
     const navigationCommands: CommandItem[] = useMemo(() => [
@@ -135,6 +136,15 @@ export const CommandPalette = ({ metrics = [], dimensions = [] }: CommandPalette
             keywords: ['docs', 'documentation', 'help', 'guide']
         },
         {
+            id: 'nav-glossary',
+            title: 'Go to Glossary',
+            subtitle: 'Business definitions',
+            icon: BookOpen,
+            category: 'navigation',
+            action: () => navigate('/glossary'),
+            keywords: ['glossary', 'definitions', 'business']
+        },
+        {
             id: 'nav-settings',
             title: 'Go to Settings',
             subtitle: 'Configure AXI',
@@ -193,7 +203,7 @@ export const CommandPalette = ({ metrics = [], dimensions = [] }: CommandPalette
 
     // Recent page commands
     const recentCommands: CommandItem[] = useMemo(() => {
-        const pageNames: Record<string, { title: string; icon: React.ElementType }> = {
+        const pageNames: Record<string, { title: string; icon: ElementType }> = {
             '/': { title: 'Home', icon: LayoutDashboard },
             '/metrics': { title: 'Metrics', icon: BarChart3 },
             '/dimensions': { title: 'Dimensions', icon: Ruler },
@@ -276,7 +286,7 @@ export const CommandPalette = ({ metrics = [], dimensions = [] }: CommandPalette
     }, [isOpen]);
 
     // Handle keyboard navigation
-    const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    const handleKeyDown = useCallback((e: ReactKeyboardEvent) => {
         switch (e.key) {
             case 'ArrowDown':
                 e.preventDefault();
@@ -443,22 +453,6 @@ export const CommandPalette = ({ metrics = [], dimensions = [] }: CommandPalette
             </div>
         </>
     );
-};
-
-// Hook for registering keyboard shortcuts elsewhere
-export const useKeyboardShortcut = (key: string, callback: () => void, ctrl = false) => {
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            const ctrlPressed = e.metaKey || e.ctrlKey;
-            if (ctrlPressed === ctrl && e.key.toLowerCase() === key.toLowerCase()) {
-                e.preventDefault();
-                callback();
-            }
-        };
-
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [key, callback, ctrl]);
 };
 
 export default CommandPalette;

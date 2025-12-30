@@ -246,6 +246,81 @@ def get_metric(metric_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
+@router.get("/{metric_id}/dependencies")
+def get_metric_dependencies(metric_id: str):
+    """
+    Get upstream/downstream metadata for lineage visualization.
+    """
+    logger.debug(f"Getting metric dependencies: {metric_id}")
+    indexer = _get_indexer()
+    try:
+        with indexer._get_conn() as conn:
+            _init_metrics_tables(conn)
+            
+            # Resolve metric name from ID if needed
+            try:
+                metric_id_int = int(metric_id)
+                metric_name = _get_metric_name(conn, metric_id_int)
+                if not metric_name:
+                    raise HTTPException(status_code=404, detail="Metric not found")
+            except (ValueError, TypeError):
+                metric_name = metric_id
+
+        metric = indexer.get_metric(metric_name)
+        if not metric:
+            raise HTTPException(status_code=404, detail="Metric not found")
+
+        source_model = metric.get("model") or metric.get("source_model")
+        entity = metric.get("entity_name") or metric.get("entity")
+
+        source_tables: List[str] = []
+        if source_model:
+            model = indexer.get_model(source_model)
+            if model:
+                source_tables = model.get("source_tables") or []
+
+        dims = metric.get("default_dimensions") or metric.get("dimensions") or []
+        if isinstance(dims, str):
+            try:
+                parsed_dims = json.loads(dims)
+                dims = parsed_dims if isinstance(parsed_dims, list) else [parsed_dims]
+            except (json.JSONDecodeError, TypeError, ValueError):
+                dims = [dims]
+
+        downstream_metrics: List[str] = []
+        try:
+            for m in indexer.list_metrics():
+                deps = m.get("depends_on") or []
+                if isinstance(deps, str):
+                    try:
+                        deps = json.loads(deps)
+                    except (json.JSONDecodeError, TypeError, ValueError):
+                        deps = []
+                if isinstance(deps, list) and metric_name in deps:
+                    downstream_metrics.append(m.get("name") or m.get("metric"))
+        except Exception as e:
+            logger.warning(f"Error computing downstream metrics for {metric_name}: {e}")
+
+        return {
+            "dependencies": metric.get("depends_on") or [],
+            "source_model": source_model,
+            "entity": entity,
+            "source_tables": source_tables,
+            "dimensions": dims,
+            "downstream_metrics": downstream_metrics
+        }
+    except HTTPException:
+        raise
+    except DatabaseError as e:
+        logger.warning(f"Database error getting metric dependencies: {e}")
+        raise HTTPException(status_code=500, detail=e.to_dict())
+    except Exception as e:
+        logger.error(f"Unexpected error getting metric dependencies: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=MetadataError(f"Failed to get metric dependencies: {e}", code="METRIC_DEPENDENCIES_ERROR").to_dict()
+        )
+
 @router.get("/{metric_id}/dimensions")
 def get_metric_dimensions(metric_id: str):
     """
@@ -448,14 +523,14 @@ def get_metric_sample(metric_id: str, limit: int = 20):
                     default_dims = json.loads(row[0]) if isinstance(row[0], str) else row[0]
                 except (json.JSONDecodeError, TypeError, ValueError):
                     default_dims = []
-        
+            
         # Generate SQL and execute (outside connection context)
         try:
             engine = SemanticQueryEngine(indexer)
             sql = engine.generate_sql(metric_name, default_dims, [], dialect="snowflake")
             
             runner = SnowflakeRunner()
-            rows, columns = runner.execute_query(f"{sql} LIMIT {limit}")
+            rows, columns, _ = runner.execute_query(f"{sql} LIMIT {limit}")
             return {
                 "columns": columns,
                 "rows": rows
@@ -551,6 +626,12 @@ class UpdateMetricRequest(BaseModel):
             return validated
         return v
 
+class MetricJoinPlanRequest(BaseModel):
+    """Request model for previewing join plan for a metric."""
+    entity: str
+    expression: str
+    dimensions: Optional[List[str]] = Field(default_factory=list)
+
 def _get_metric_store():
     """Get metric store instance."""
     # Find project root
@@ -617,7 +698,34 @@ def create_metric(req: CreateMetricRequest):
                 metric_data["type"] = "custom"
         except:
             metric_data["type"] = "custom"
-    
+
+    # Build dimension_entity_map for cross-entity dimensions
+    if metric_data.get("dimensions") and metric_data.get("entity"):
+        from axi.query.reachability import SemanticReachability
+        reachability = SemanticReachability(indexer)
+
+        try:
+            # Get reachability context for the entity
+            entity_name = metric_data["entity"]
+            context = reachability.plan_context([], [entity_name])
+
+            # Build dimension -> entity mapping
+            dimension_entity_map = {}
+            for dim_name in metric_data["dimensions"]:
+                # Find which entity this dimension belongs to
+                for visible_dim in context.get("visible_dimensions", []):
+                    if visible_dim["name"] == dim_name:
+                        dimension_entity_map[dim_name] = visible_dim["entity"]
+                        break
+
+            # Store the mapping if it has entries
+            if dimension_entity_map:
+                metric_data["dimension_entity_map"] = dimension_entity_map
+                logger.debug(f"Built dimension_entity_map for {req.metric}: {dimension_entity_map}")
+        except Exception as e:
+            logger.warning(f"Failed to build dimension_entity_map: {e}")
+            # Continue without the map - it's optional
+
     try:
         # Create metric
         created = store.create(metric_data)
@@ -635,6 +743,105 @@ def create_metric(req: CreateMetricRequest):
     except Exception as e:
         logger.error(f"Unexpected error creating metric: {e}")
         raise HTTPException(status_code=500, detail=MetadataError(f"Failed to create metric: {e}", code="METRIC_CREATE_ERROR").to_dict())
+
+@router.post("/preview-join-plan")
+def preview_join_plan(req: MetricJoinPlanRequest):
+    """
+    Preview what JOINs will be required for a metric definition.
+    Returns join paths, involved entities, and dimension-to-entity mappings.
+    """
+    logger.info(f"Previewing join plan for entity: {req.entity}")
+
+    indexer = _get_indexer()
+    engine = SemanticQueryEngine(indexer)
+
+    try:
+        # Extract metric references from expression
+        metric_refs = engine._extract_metric_references(req.expression)
+
+        # Determine involved entities
+        involved_entities = {req.entity}
+
+        # Add entities from referenced metrics
+        for ref_name in metric_refs:
+            ref_metric = indexer.get_metric(ref_name)
+            if ref_metric:
+                ref_entity = ref_metric.get('entity_name')
+                if ref_entity:
+                    involved_entities.add(ref_entity)
+
+        # Map dimensions to entities using reachability
+        dimension_entity_map = {}
+        if req.dimensions:
+            context = engine.reachability.plan_context([], [req.entity])
+            for dim_name in req.dimensions:
+                # Find which entity this dimension belongs to
+                for visible_dim in context.get('visible_dimensions', []):
+                    if visible_dim['name'] == dim_name:
+                        dimension_entity_map[dim_name] = visible_dim['entity']
+                        involved_entities.add(visible_dim['entity'])
+                        break
+
+        # Compute join paths for all involved entities (except base)
+        join_paths = {}
+        warnings = []
+
+        # Get base entity's model
+        base_entity_obj = indexer.get_entity(req.entity)
+        if not base_entity_obj:
+            return {
+                "error": f"Entity '{req.entity}' not found",
+                "base_entity": req.entity,
+                "involved_entities": list(involved_entities),
+                "join_paths": {},
+                "dimension_entity_map": dimension_entity_map,
+                "metric_references": metric_refs,
+                "warnings": [f"Entity '{req.entity}' not found"]
+            }
+
+        base_model = base_entity_obj.get('model') or req.entity
+
+        for entity_name in involved_entities:
+            if entity_name != req.entity:
+                # Get model for this entity
+                entity_obj = indexer.get_entity(entity_name)
+                if not entity_obj:
+                    warnings.append(f"Entity '{entity_name}' not found")
+                    continue
+
+                target_model = entity_obj.get('model') or entity_name
+
+                try:
+                    # Get join path
+                    path = engine._resolve_join_path(base_model, target_model)
+                    join_paths[entity_name] = [
+                        {
+                            "from": edge.get("source"),
+                            "to": edge.get("target"),
+                            "fk": edge.get("source_col"),
+                            "pk": edge.get("target_col")
+                        }
+                        for edge in path
+                    ]
+                except Exception as e:
+                    warnings.append(f"Cannot join to {entity_name}: {str(e)}")
+
+        return {
+            "base_entity": req.entity,
+            "base_model": base_model,
+            "involved_entities": list(involved_entities),
+            "join_paths": join_paths,
+            "dimension_entity_map": dimension_entity_map,
+            "metric_references": metric_refs,
+            "warnings": warnings
+        }
+
+    except Exception as e:
+        logger.error(f"Error previewing join plan: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=MetadataError(f"Failed to preview join plan: {e}", code="JOIN_PLAN_ERROR").to_dict()
+        )
 
 @router.put("/{metric_name}")
 def update_metric(metric_name: str, req: UpdateMetricRequest):
@@ -669,7 +876,34 @@ def update_metric(metric_name: str, req: UpdateMetricRequest):
     if not is_valid:
         logger.warning(f"Validation failed for metric update {validated_name}: {errors}")
         raise HTTPException(status_code=400, detail=ValidationError("Metric validation failed", code="VALIDATION_ERROR", context={"errors": errors}).to_dict())
-    
+
+    # Build dimension_entity_map if dimensions or entity changed
+    if updated_data.get("dimensions") and updated_data.get("entity"):
+        from axi.query.reachability import SemanticReachability
+        reachability = SemanticReachability(indexer)
+
+        try:
+            # Get reachability context for the entity
+            entity_name = updated_data["entity"]
+            context = reachability.plan_context([], [entity_name])
+
+            # Build dimension -> entity mapping
+            dimension_entity_map = {}
+            for dim_name in updated_data["dimensions"]:
+                # Find which entity this dimension belongs to
+                for visible_dim in context.get("visible_dimensions", []):
+                    if visible_dim["name"] == dim_name:
+                        dimension_entity_map[dim_name] = visible_dim["entity"]
+                        break
+
+            # Store the mapping in updates if it has entries
+            if dimension_entity_map:
+                updates["dimension_entity_map"] = dimension_entity_map
+                logger.debug(f"Built dimension_entity_map for {validated_name}: {dimension_entity_map}")
+        except Exception as e:
+            logger.warning(f"Failed to build dimension_entity_map: {e}")
+            # Continue without the map - it's optional
+
     try:
         # Update metric
         updated = store.update(validated_name, updates)
@@ -758,4 +992,3 @@ def get_allowed_dimensions(metric_name: str):
         "grain": effective_grain,
         "metric": validated_name
     }
-

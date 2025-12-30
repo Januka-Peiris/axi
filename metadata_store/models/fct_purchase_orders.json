@@ -1,0 +1,178 @@
+{
+  "model": "fct_purchase_orders",
+  "metrics": [
+    {
+      "name": "total_lines",
+      "expression": "COUNT(*)",
+      "model": "fct_purchase_orders",
+      "source_table": "fct_purchase_orders",
+      "grain": [
+        "purchaseorderid"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "count",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_ordered_outers",
+      "expression": "SUM(orderedouters)",
+      "model": "fct_purchase_orders",
+      "source_table": "fct_purchase_orders",
+      "grain": [
+        "purchaseorderid"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_received_outers",
+      "expression": "SUM(receivedouters)",
+      "model": "fct_purchase_orders",
+      "source_table": "fct_purchase_orders",
+      "grain": [
+        "purchaseorderid"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_expected_amount",
+      "expression": "SUM(expectedunitpriceperouter * orderedouters)",
+      "model": "fct_purchase_orders",
+      "source_table": "fct_purchase_orders",
+      "grain": [
+        "purchaseorderid"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    },
+    {
+      "name": "total_actual_cost",
+      "expression": "SUM(expectedunitpriceperouter * receivedouters)",
+      "model": "fct_purchase_orders",
+      "source_table": "fct_purchase_orders",
+      "grain": [
+        "purchaseorderid"
+      ],
+      "metric_type": "aggregate",
+      "aggregation": "sum",
+      "default_dimensions": [],
+      "default_filter": "",
+      "time_dimension": "",
+      "depends_on": [],
+      "numerator": "",
+      "denominator": "",
+      "semi_additive_method": "",
+      "semi_additive_dimension": "",
+      "tags": [],
+      "description": ""
+    }
+  ],
+  "dimensions": [
+    "purchaseorderid"
+  ],
+  "dimension_details": [
+    {
+      "name": "purchaseorderid",
+      "included": true,
+      "reason": "group_by",
+      "roles": [
+        "grain"
+      ]
+    }
+  ],
+  "filters": [
+    "po._fivetran_deleted = FALSE"
+  ],
+  "source_tables": [
+    "final",
+    "stg__purchasing__purchaseorders",
+    "stg__purchasing__purchaseorderlines",
+    "purchase_order_lines",
+    "purchase_orders_base",
+    "purchase_order_aggregates"
+  ],
+  "entity": {
+    "name": "fct_purchase_orders",
+    "pk": "purchaseorderid",
+    "columns": []
+  },
+  "relationships": [
+    {
+      "parent_model": "stg__purchasing__purchaseorders",
+      "child_model": "fct_purchase_orders",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "stg__purchasing__purchaseorderlines",
+      "child_model": "fct_purchase_orders",
+      "fk_column": "",
+      "pk_column": "",
+      "join_type": "DEPENDS_ON"
+    },
+    {
+      "parent_model": "purchase_order_aggregates",
+      "child_model": "purchase_orders_base",
+      "fk_column": "purchaseorderid",
+      "pk_column": "purchaseorderid",
+      "join_type": "INNER"
+    },
+    {
+      "parent_model": "purchase_order_aggregates",
+      "child_model": "fct_purchase_orders",
+      "fk_column": "purchaseorderid",
+      "pk_column": "purchaseorderid",
+      "join_type": "INNER"
+    }
+  ],
+  "grain_status": "clear",
+  "grain_detection": "group_by",
+  "grain_columns": [
+    "purchaseorderid"
+  ],
+  "semantic_intent": "semantic_candidate",
+  "semantic_node": "purchase_order_aggregates",
+  "grain_scope": "cte",
+  "grain_reasons": []
+}

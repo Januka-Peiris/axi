@@ -1,30 +1,243 @@
-# CLI & Workflow
+# CLI Reference
 
-The `axi` CLI wires extraction, promotion, and querying. Key commands:
+The `axi` command-line tool provides full access to AXI's semantic layer capabilities.
 
-## Project setup
-- Scaffold a project: `axi scaffold` (creates `axi.yml`, rules, glossary, overrides, metadata_store).
-- Generate stubs: `axi generate metric <name> --entity <entity>`, `axi generate dimension <name> --entity <entity>`, `axi generate glossary <term>`, `axi generate rule promotion`.
+<br>
 
-## Extraction & promotion
-- Run extraction with dbt-aware defaults: `axi extract` (auto-detects compiled models from `axi.yml` or `target/compiled/<project>`).
-- dbt helpers: `axi dbt scan` (compile + extract), `axi dbt manifest <path>` (load manifest), `axi dbt describe <model>`.
-- Promotion dashboard data lives in `metadata_store/` and is exposed at `/api/promotion`.
+---
 
-## Querying
-- Generate semantic SQL: `axi query --metric <metric> --dims country,date --filters "country=US"`
-- Snowflake execution: `axi query --run` executes via `SnowflakeRunner`.
-- Time intelligence & optimization flags are also available under `axi metrics sql`.
-- Saved queries (YAML-backed):
-  - Files live in `axi/queries/<id>.yml`.
-  - API: `GET/POST/DELETE /api/saved_queries`, `POST /api/saved_queries/{id}/run` (supports override filters/limit).
-  - UI: save/load/run in the Query Console; browse at `/saved-queries`.
+## Installation
 
-## Glossary & cache
-- Glossary: `axi glossary generate` and `axi glossary search <term>`.
-- Cache inspection: `axi cache show` / `axi cache clear [--metric ...]`.
+```bash
+pip install axi-cli
+```
 
-## Debugging
-- Set `AXI_DEBUG=true` to log scanner decisions and dbt detection.
-- `axi extract --debug-models` lists discovered models without extracting.
-- Full graph API is gated by `AXI_DEBUG=1`; otherwise use filtered/local graph endpoints.
+<br>
+
+---
+
+## Quick Reference
+
+<br>
+
+| Command | Description |
+|---------|-------------|
+| `axi extract` | Extract metadata from SQL models |
+| `axi metrics list` | List all metrics |
+| `axi query` | Generate and run semantic queries |
+| `axi ui` | Start the web interface |
+
+<br>
+
+---
+
+## Commands
+
+<br>
+
+### Project Setup
+
+```bash
+# Initialize a new AXI project
+axi scaffold
+
+# This creates:
+# - axi.yml (configuration)
+# - metadata_store/ (extracted metadata)
+# - glossary/ (business terms)
+# - overrides/ (customizations)
+```
+
+<br>
+
+### Extraction
+
+```bash
+# Extract from current directory
+axi extract
+
+# Extract from specific path
+axi extract /path/to/project
+
+# Debug mode - see what's being scanned
+axi extract --debug
+
+# List discovered models without extracting
+axi extract --debug-models
+```
+
+<br>
+
+### dbt Integration
+
+```bash
+# Compile and extract dbt project
+axi dbt scan
+
+# Load manifest directly
+axi dbt manifest target/manifest.json
+
+# Describe a model
+axi dbt describe orders
+```
+
+<br>
+
+### Metrics
+
+```bash
+# List all metrics
+axi metrics list
+
+# Describe a specific metric
+axi metrics describe revenue
+
+# Generate SQL for a metric
+axi metrics sql revenue --dims region,date
+
+# With time intelligence
+axi metrics sql revenue --compare previous_period
+
+# View metric dependencies
+axi metrics deps revenue
+```
+
+<br>
+
+### Querying
+
+```bash
+# Generate semantic SQL
+axi query --metric revenue --dims region,date
+
+# Add filters
+axi query --metric revenue --dims region --filters "region=US"
+
+# Execute against Snowflake
+axi query --metric revenue --dims region --run
+
+# Set result limit
+axi query --metric revenue --dims region --limit 100
+```
+
+<br>
+
+### Snowflake
+
+```bash
+# Sync metadata from Snowflake
+axi snowflake sync
+
+# Sync specific schemas
+axi snowflake sync --schemas MARTS,ANALYTICS
+
+# List tables
+axi snowflake tables
+
+# View columns
+axi snowflake columns my_table
+
+# Check constraints
+axi snowflake constraints
+
+# View lineage
+axi snowflake lineage my_table
+```
+
+<br>
+
+### Glossary
+
+```bash
+# Generate glossary from extracted metadata
+axi glossary generate
+
+# Search for terms
+axi glossary search "revenue"
+```
+
+<br>
+
+### Cache
+
+```bash
+# Show cache status
+axi cache show
+
+# Clear all cache
+axi cache clear
+
+# Clear specific metric
+axi cache clear --metric revenue
+```
+
+<br>
+
+### UI
+
+```bash
+# Start backend and frontend
+axi ui
+
+# Backend only (API server)
+axi ui --no-frontend
+
+# Custom ports
+axi ui --port 9000 --frontend-port 3001
+```
+
+<br>
+
+---
+
+## Environment Variables
+
+<br>
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AXI_DEBUG` | `false` | Enable debug logging |
+| `AXI_METADATA_DIR` | `./metadata_store` | Metadata storage location |
+| `AXI_LOG_LEVEL` | `INFO` | Log level |
+
+<br>
+
+---
+
+## Configuration File
+
+AXI uses `axi.yml` for project settings:
+
+```yaml
+project: my_project
+
+dbt:
+  compiled_path: target/compiled/my_project/models
+
+promotion:
+  include:
+    folders: ["models/marts/**"]
+    tags: ["axi"]
+  exclude:
+    folders: ["models/staging/**"]
+
+snowflake:
+  account: xy12345.us-east-1
+  warehouse: compute_wh
+  database: analytics
+```
+
+<br>
+
+---
+
+## Getting Help
+
+```bash
+# General help
+axi --help
+
+# Command-specific help
+axi extract --help
+axi query --help
+```
