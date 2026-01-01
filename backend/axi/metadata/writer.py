@@ -6,6 +6,9 @@ import json
 import os
 from typing import Dict, Any
 
+from axi.version import SCHEMA_VERSION
+
+
 class MetadataWriter:
     def __init__(self, output_dir: str):
         self.output_dir = os.path.abspath(output_dir)
@@ -38,6 +41,9 @@ class MetadataWriter:
         models_dir = os.path.join(self.output_dir, "models")
         os.makedirs(models_dir, exist_ok=True)
         path = os.path.join(models_dir, filename)
-        
+
+        # Add schema version for forwards compatibility
+        versioned_metadata = {"schema_version": SCHEMA_VERSION, **metadata}
+
         with open(path, "w") as f:
-            json.dump(metadata, f, indent=2)
+            json.dump(versioned_metadata, f, indent=2, sort_keys=True)

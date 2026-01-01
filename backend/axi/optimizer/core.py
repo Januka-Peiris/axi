@@ -31,8 +31,8 @@ class Optimizer:
         
         # Apply Rules
         for rule in self.rules:
-            # Check config if rule is enabled (default true)
-            if self.context.config.get(f"optimizer.rules.{rule.name}", True):
+            # Check config if rule is enabled (default false - rules must be explicitly enabled)
+            if self.context.config.get(f"optimizer.rules.{rule.name}", False):
                 new_expression = rule.apply(expression, self.context)
                 if new_expression != expression:
                      # Track if changed? naive check

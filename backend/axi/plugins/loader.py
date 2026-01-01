@@ -23,7 +23,7 @@ class PluginLoader:
             
             # Scan for python files or packages
             # Assumption: plugins are dirs with axi_plugin.py or simple .py files
-            for entry in os.listdir(path):
+            for entry in sorted(os.listdir(path)):
                 full_path = os.path.join(path, entry)
                 if os.path.isdir(full_path):
                      self._load_from_dir(full_path)

@@ -11,6 +11,12 @@ from importlib import metadata
 # Keep this in sync with backend/pyproject.toml
 __version__ = "0.1.0"
 
+# Metadata schema version - bump when breaking changes to metadata format
+# Format: MAJOR.MINOR (no patch - schema changes are either breaking or additive)
+# MAJOR: Breaking changes that require migration
+# MINOR: Additive changes (new optional fields)
+SCHEMA_VERSION = "1.0"
+
 
 def get_version() -> str:
     """

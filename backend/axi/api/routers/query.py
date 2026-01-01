@@ -302,7 +302,6 @@ def run_semantic_query(req: SemanticQueryRequest):
                 "sql": sql,
                 "columns": columns,
                 "rows": rows_list,
-                "generated_at": datetime.utcnow().isoformat(),
                 "execution_ms": elapsed,
                 "entity": entity_name,
                 "metrics": req.metrics
@@ -397,8 +396,7 @@ def generate_sql_only(req: SemanticQueryRequest):
             "entity": entity_name,
             "metrics": req.metrics,
             "grain": effective_grain,
-            "execution_ms": 0,
-            "generated_at": datetime.utcnow().isoformat()
+            "execution_ms": 0
         }
     except HTTPException:
         raise
@@ -443,8 +441,7 @@ def get_query_plan(req: SemanticQueryRequest):
             })
         
         return {
-            "plan": plan,
-            "generated_at": datetime.utcnow().isoformat()
+            "plan": plan
         }
     except HTTPException:
         raise
@@ -482,8 +479,7 @@ def get_reachable_dimensions(req: SemanticQueryRequest):
         return {
             "visible_dimensions": all_visible,
             "excluded_dimensions": all_excluded,
-            "dimensions": flat_dims,
-            "generated_at": datetime.utcnow().isoformat()
+            "dimensions": flat_dims
         }
     except HTTPException:
         raise

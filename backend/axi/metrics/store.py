@@ -94,7 +94,7 @@ class MetricStore:
 
         # Write YAML file
         with open(path, "w") as f:
-            yaml.dump(metric_data, f, default_flow_style=False, sort_keys=False)
+            yaml.dump(metric_data, f, default_flow_style=False, sort_keys=True)
         
         return metric_data
     
@@ -134,7 +134,7 @@ class MetricStore:
 
         # Write back
         with open(path, "w") as f:
-            yaml.dump(updated, f, default_flow_style=False, sort_keys=False)
+            yaml.dump(updated, f, default_flow_style=False, sort_keys=True)
         
         return updated
     
@@ -153,7 +153,7 @@ class MetricStore:
         if not os.path.exists(self.metrics_dir):
             return metrics
         
-        for filename in os.listdir(self.metrics_dir):
+        for filename in sorted(os.listdir(self.metrics_dir)):
             if filename.endswith(".yml") or filename.endswith(".yaml"):
                 metric_name = os.path.splitext(filename)[0]
                 metric = self.get(metric_name)

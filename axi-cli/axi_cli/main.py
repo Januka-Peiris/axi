@@ -7,6 +7,8 @@ import atexit
 from importlib import metadata
 from typing import List, Optional
 
+from . import exit_codes
+
 # Ensure backend is in pythonpath
 current_dir = os.path.dirname(os.path.abspath(__file__))
 backend_path = os.path.join(os.path.dirname(os.path.dirname(current_dir)), "backend")
@@ -169,11 +171,21 @@ def extract(
     path: str = typer.Argument(None),
     debug: bool = typer.Option(False, "--debug", help="Enable verbose debug logging"),
     debug_models: bool = typer.Option(False, "--debug-models", help="List all discovered models without extracting"),
-    no_dbt: bool = typer.Option(False, "--no-dbt", help="Disable dbt manifest loading entirely")
+    no_dbt: bool = typer.Option(False, "--no-dbt", help="Disable dbt manifest loading entirely"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Validate and show what would be extracted without writing"),
+    quiet: bool = typer.Option(False, "--quiet", "-q", help="Suppress non-error output (for CI/CD)"),
+    summary: str = typer.Option(None, "--summary", help="Write JSON run summary to file (for CI/CD)")
 ):
     """
     Run metadata extraction on the given path (CLI-mode).
     """
+    from .run_summary import RunSummary, FailureEntry, SkippedEntry
+    run_start = RunSummary.now_iso()
+    # Helper for conditional output
+    def echo(msg: str, err: bool = False):
+        if not quiet or err:
+            typer.echo(msg, err=err)
+
     # Silence noisy sqlglot warnings about ToChar format args during parsing
     import warnings
     warnings.filterwarnings(
@@ -186,6 +198,9 @@ def extract(
     else:
         if "AXI_DEBUG" in os.environ:
             del os.environ["AXI_DEBUG"]
+
+    if dry_run:
+        echo("[DRY-RUN] Validation mode - no files will be written")
 
     # Find project root (where axi.yml or dbt_project.yml might be)
     cwd = os.getcwd()
@@ -216,8 +231,8 @@ def extract(
         # (1) User passed a path → ALWAYS use it
         sql_root = os.path.abspath(path)
         if not os.path.exists(sql_root):
-            typer.echo(f"✗ Error: Path does not exist: {sql_root}")
-            raise typer.Exit(1)
+            typer.echo(f"✗ Error: Path does not exist: {sql_root}", err=True)
+            raise typer.Exit(exit_codes.NOT_FOUND)
         if os.environ.get("AXI_DEBUG") == "true":
             print(f"[AXI-DEBUG] Using SQL root (user-provided): {sql_root}")
     elif not no_dbt and config.dbt and config.dbt.compiled_path:
@@ -229,8 +244,8 @@ def extract(
             compiled_path = os.path.join(project_root, config.dbt.compiled_path)
         compiled_roots.append(compiled_path)
         if not os.path.exists(compiled_path):
-            typer.echo(f"[WARN] Compiled dbt models not found at: {compiled_path}")
-            typer.echo("       Falling back to raw SQL; run 'dbt compile' for best results.")
+            echo(f"[WARN] Compiled dbt models not found at: {compiled_path}")
+            echo("       Falling back to raw SQL; run 'dbt compile' for best results.")
         if os.environ.get("AXI_DEBUG") == "true":
             print(f"[AXI-DEBUG] Using SQL root (project): {sql_root}")
             print(f"[AXI-DEBUG] Compiled SQL fallback: {compiled_path}")
@@ -259,25 +274,25 @@ def extract(
                         compiled_roots.append(default_compiled_path)
                         sql_root = project_root
                         if not os.path.exists(default_compiled_path):
-                            typer.echo("[WARN] Compiled dbt models not found.")
-                            typer.echo(f"       Expected at: {default_compiled_path}")
-                            typer.echo("       Falling back to raw SQL; run 'dbt compile' for best results.")
+                            echo("[WARN] Compiled dbt models not found.")
+                            echo(f"       Expected at: {default_compiled_path}")
+                            echo("       Falling back to raw SQL; run 'dbt compile' for best results.")
                         if os.environ.get("AXI_DEBUG") == "true":
                             print(f"[AXI-DEBUG] Using SQL root (dbt project): {sql_root}")
                             print(f"[AXI-DEBUG] Compiled SQL fallback: {default_compiled_path}")
                     else:
-                        typer.echo("✗ Error: Could not determine dbt project name.")
-                        typer.echo("  Run: dbt compile")
-                        raise typer.Exit(1)
+                        typer.echo("✗ Error: Could not determine dbt project name.", err=True)
+                        typer.echo("  Run: dbt compile", err=True)
+                        raise typer.Exit(exit_codes.CONFIG_ERROR)
                 except Exception as e:
-                    typer.echo(f"✗ Error reading dbt manifest: {e}")
-                    raise typer.Exit(1)
+                    typer.echo(f"✗ Error reading dbt manifest: {e}", err=True)
+                    raise typer.Exit(exit_codes.CONFIG_ERROR)
             else:
                 # dbt project but no manifest - only allow if --no-dbt
-                typer.echo("✗ Error: dbt project detected but manifest.json not found.")
-                typer.echo("  Run: dbt compile")
-                typer.echo("  Or use: axi extract --no-dbt (for raw SQL mode)")
-                raise typer.Exit(1)
+                typer.echo("✗ Error: dbt project detected but manifest.json not found.", err=True)
+                typer.echo("  Run: dbt compile", err=True)
+                typer.echo("  Or use: axi extract --no-dbt (for raw SQL mode)", err=True)
+                raise typer.Exit(exit_codes.CONFIG_ERROR)
         else:
             # (4) No dbt project → raw SQL mode
             sql_root = cwd
@@ -288,11 +303,11 @@ def extract(
         sql_root = cwd
         if os.environ.get("AXI_DEBUG") == "true":
             print(f"[AXI-DEBUG] Using SQL root (--no-dbt, raw SQL mode): {sql_root}")
-    
+
     if sql_root is None:
-        typer.echo("✗ Error: Could not determine SQL root path.")
-        raise typer.Exit(1)
-    
+        typer.echo("✗ Error: Could not determine SQL root path.", err=True)
+        raise typer.Exit(exit_codes.CONFIG_ERROR)
+
     # Create scanner with sql_root
     promotion_engine = PromotionEngine(config)
     scanner = SqlScanner(sql_root, promotion_engine, compiled_roots=compiled_roots)
@@ -300,13 +315,13 @@ def extract(
     indexer = MetadataIndexer(METADATA_DIR)
     
     if debug_models:
-        typer.echo("=== MODEL DISCOVERY DEBUG ===")
-        typer.echo(f"SQL Root: {sql_root}")
+        echo("=== MODEL DISCOVERY DEBUG ===")
+        echo(f"SQL Root: {sql_root}")
         for model in scanner.scan():
-             typer.echo(f"FOUND: {model.path}")
+             echo(f"FOUND: {model.path}")
         return
 
-    typer.echo(f"Scanning SQL from: {sql_root}")
+    echo(f"Scanning SQL from: {sql_root}")
     
     # Load dbt manifest ONLY for metadata (not file paths) unless --no-dbt is set
     if not no_dbt:
@@ -314,33 +329,38 @@ def extract(
         manifest_path = os.path.join(project_root, "target", "manifest.json")
         
         if os.path.exists(dbt_project_file) and os.path.exists(manifest_path):
-            typer.echo("✔ Loading dbt manifest metadata...")
+            echo("✔ Loading dbt manifest metadata...")
             from axi.dbt.manifest_loader import ManifestLoader
             from axi.dbt.semantic_bridge import SemanticBridge
-             
+
             try:
-                loader = ManifestLoader(indexer)
-                loader.load_manifest(manifest_path)
-                
-                bridge = SemanticBridge(indexer)
-                bridge.map_constraints()
-                typer.echo("  ✔ Manifest metadata loaded & constraints mapped.")
+                if not dry_run:
+                    loader = ManifestLoader(indexer)
+                    loader.load_manifest(manifest_path)
+
+                    bridge = SemanticBridge(indexer)
+                    bridge.map_constraints()
+                echo("  ✔ Manifest metadata loaded & constraints mapped.")
             except Exception as e:
-                typer.echo(f"  [WARN] Failed to load manifest: {e}")
+                echo(f"  [WARN] Failed to load manifest: {e}")
 
     # Clear previous promotion results
-    indexer.clear_promotion_results()
-    
+    if not dry_run:
+        indexer.clear_promotion_results()
+
     stats = {
         "scanned": 0,
         "parsed": 0,
+        "skipped": 0,
         "failed": 0
     }
-    
+    failures_list: List[FailureEntry] = []
+    skipped_list: List[SkippedEntry] = []
+
     for model in scanner.scan():
         stats["scanned"] += 1
         model_name = os.path.splitext(os.path.basename(model.path))[0]
-        
+
         # Record promotion result
         promotion_result = model.promotion_result if hasattr(model, 'promotion_result') else None
         if promotion_result:
@@ -351,62 +371,102 @@ def extract(
             status = "ignored"
             reason = "not_tracked"
             matched_rule = None
-        
+
         entity_created = False
         dimensions_count = 0
         metrics_count = 0
         error_message = None
-        
+
         try:
             if promotion_result and promotion_result.promoted and model.content:
                 meta = extract_metadata(model.content, model_name, config=config)
                 if meta.get("grain_status") == "not_detected":
-                    typer.echo(f"[SKIP] {model_name}: no grouping/aggregation detected (treated as staging/non-semantic).")
+                    echo(f"[SKIP] {model_name}: no grouping/aggregation detected (treated as staging/non-semantic).")
+                    stats["skipped"] += 1
+                    skipped_list.append(SkippedEntry(item=model_name, reason="no grouping/aggregation detected"))
                     continue
-                writer.write(meta)
+                if not dry_run:
+                    writer.write(meta)
                 stats["parsed"] += 1
-                
+
                 # Count extracted items
                 entity_created = "entity" in meta and meta.get("entity", {}).get("name") == model_name
                 dimensions_count = len(meta.get("dimensions", []))
                 metrics_count = len(meta.get("metrics", []))
-                
-                if debug:
-                    typer.echo(f"[AXI-DEBUG] Extracted: {model_name}")
+
+                if debug or dry_run:
+                    prefix = "[DRY-RUN] " if dry_run else "[AXI-DEBUG] "
+                    echo(f"{prefix}Would extract: {model_name} ({metrics_count} metrics, {dimensions_count} dimensions)")
             else:
-                # Model was not promoted, so don't extract
-                stats["failed"] += 1
+                # Model was not promoted - this is a skip, not a failure
+                stats["skipped"] += 1
+                skip_reason = promotion_result.reason if promotion_result else "not promoted"
+                skipped_list.append(SkippedEntry(item=model_name, reason=skip_reason))
         except Exception as e:
             stats["failed"] += 1
             status = "error"
             error_message = str(e)
-            # Error already logged by extract_metadata if debug is on
-            if debug:
-                typer.echo(f"  [FAIL] {model_name}")
-        
-        # Record promotion result
-        indexer.record_promotion_result(
-            name=model_name,
-            path=model.path,
-            status=status,
-            reason=reason,
-            source="dbt" if not no_dbt else "raw_sql",
-            model_type="model",
-            matched_rule=matched_rule,
-            error_message=error_message,
-            entity_created=entity_created,
-            dimensions_count=dimensions_count,
-            metrics_count=metrics_count
-        )
+            failures_list.append(FailureEntry(item=model_name, error=str(e)))
+            # Always report failures to stderr
+            typer.echo(f"[FAIL] {model_name}: {e}", err=True)
 
-    typer.echo("Rebuilding Index...")
-    indexer.build_index()
-    
-    typer.echo("\n======== AXI EXTRACTION SUMMARY ========")
-    typer.echo(f"Models scanned: {stats['scanned']}")
-    typer.echo(f"Models parsed successfully: {stats['parsed']}")
-    typer.echo(f"Models with parse errors: {stats['failed']}")
-    typer.echo("========================================")
+        # Record promotion result (skip in dry-run)
+        if not dry_run:
+            indexer.record_promotion_result(
+                name=model_name,
+                path=model.path,
+                status=status,
+                reason=reason,
+                source="dbt" if not no_dbt else "raw_sql",
+                model_type="model",
+                matched_rule=matched_rule,
+                error_message=error_message,
+                entity_created=entity_created,
+                dimensions_count=dimensions_count,
+                metrics_count=metrics_count
+            )
+
+    if not dry_run:
+        echo("Rebuilding Index...")
+        indexer.build_index()
+
+    # Build run summary
+    run_status = RunSummary.compute_status(stats["parsed"], stats["failed"])
+    final_exit_code = RunSummary.compute_exit_code(run_status)
+    run_summary = RunSummary(
+        command="extract",
+        status=run_status,
+        exit_code=final_exit_code,
+        scanned=stats["scanned"],
+        processed=stats["parsed"],
+        skipped=stats["skipped"],
+        failed=stats["failed"],
+        failures=failures_list,
+        skipped_items=skipped_list,
+        started_at=run_start,
+        completed_at=RunSummary.now_iso()
+    )
+
+    # Write summary file if requested
+    if summary:
+        with open(summary, "w") as f:
+            f.write(run_summary.to_json())
+        echo(f"Run summary written to: {summary}")
+
+    echo("\n======== AXI EXTRACTION SUMMARY ========")
+    echo(f"Models scanned: {stats['scanned']}")
+    echo(f"Models parsed successfully: {stats['parsed']}")
+    echo(f"Models skipped: {stats['skipped']}")
+    echo(f"Models failed: {stats['failed']}")
+    echo(f"Status: {run_status}")
+    if dry_run:
+        echo("[DRY-RUN] No files were written")
+    echo("========================================")
+
+    # Exit with appropriate code - NEVER return success if any item failed
+    if stats["failed"] > 0:
+        # Partial or full failure - CI must be informed
+        raise typer.Exit(exit_codes.EXTRACTION_ERROR)
 
 glossary_app = typer.Typer()
 app.add_typer(glossary_app, name="glossary", help="Manage business glossary terms and definitions")

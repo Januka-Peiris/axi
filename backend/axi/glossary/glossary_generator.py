@@ -128,7 +128,8 @@ class GlossaryGenerator:
                         if met.name not in dimension_map[d_name].related_metrics:
                             dimension_map[d_name].related_metrics.append(met.name)
 
-        glossary_dims = list(dimension_map.values())
+        # Sort dimensions by name for deterministic ordering
+        glossary_dims = sorted(dimension_map.values(), key=lambda d: d.name)
         gloss_rels = []
         for rel in relationships:
             # rel: {parent_model, child_model, join_type, ...}

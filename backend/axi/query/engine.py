@@ -97,86 +97,94 @@ class SemanticQueryEngine:
             raise QueryError(f"Multiple join paths from {metric_entity} to {dim_entity}", code="JOIN_AMBIGUOUS", hint="Narrow relationships or specify explicit path.")
         return paths[0]
     
-    def get_effective_grain(self, metric: Dict[str, Any], entity: Optional[Dict[str, Any]] = None) -> List[str]:
+    def get_effective_grain_with_source(self, metric: Dict[str, Any], entity: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
-        Resolve effective grain for a metric in priority order:
-        1. Metric YAML grain (if present)
-        2. Entity default grain (if defined)
-        3. Entity primary key dimensions
-        4. All non-aggregated dimensions from model
-        
+        Resolve effective grain for a metric with explicit source tracking.
+
+        Sources (in priority order):
+        - "metric_yaml": Explicitly defined in metric YAML file
+        - "entity_default": Explicitly defined in entity definition
+        - "entity_pk": INFERRED from entity primary key (use with caution)
+        - "model_dimensions": INFERRED from model dimensions (use with caution)
+        - "none": No grain could be determined
+
         Returns:
-            List of dimension names representing the metric's grain
+            Dict with 'grain' (list of columns), 'source' (string), and 'inferred' (bool)
         """
         import json
-        
-        # Priority 1: Metric YAML grain
+
+        # Priority 1: Metric YAML grain (EXPLICIT)
         metric_grain = metric.get('grain')
         if metric_grain:
-            if isinstance(metric_grain, str):
-                # Parse JSON string if needed
-                try:
-                    grain_list = json.loads(metric_grain)
-                    if isinstance(grain_list, list):
-                        return [str(d) for d in grain_list if d]
-                    elif grain_list:
-                        return [str(grain_list)]
-                except (json.JSONDecodeError, TypeError):
-                    # Not JSON, treat as single dimension
-                    return [metric_grain] if metric_grain.strip() else []
-            elif isinstance(metric_grain, list):
-                return [str(d) for d in metric_grain if d]
-        
+            grain_list = self._parse_grain_value(metric_grain)
+            if grain_list:
+                return {"grain": grain_list, "source": "metric_yaml", "inferred": False}
+
         # Priority 2: Load entity if not provided
         if not entity:
             entity_name = metric.get('entity_name')
             if entity_name:
                 entity = self.indexer.get_entity(entity_name)
-        
-        # Priority 3: Entity default grain (if we add this field in future)
+
+        # Priority 3: Entity default grain (EXPLICIT)
         if entity:
             entity_grain = entity.get('default_grain')
             if entity_grain:
-                if isinstance(entity_grain, str):
-                    try:
-                        grain_list = json.loads(entity_grain)
-                        if isinstance(grain_list, list):
-                            return [str(d) for d in grain_list if d]
-                    except (json.JSONDecodeError, TypeError):
-                        return [entity_grain] if entity_grain.strip() else []
-                elif isinstance(entity_grain, list):
-                    return [str(d) for d in entity_grain if d]
-            
-            # Priority 4: Entity primary key
+                grain_list = self._parse_grain_value(entity_grain)
+                if grain_list:
+                    return {"grain": grain_list, "source": "entity_default", "inferred": False}
+
+            # Priority 4: Entity primary key (INFERRED - not reliable as semantic grain)
             primary_key = entity.get('primary_key')
             if primary_key:
-                if isinstance(primary_key, str):
-                    return [primary_key]
-                elif isinstance(primary_key, list):
-                    return [str(pk) for pk in primary_key if pk]
-        
-        # Priority 5: Model dimensions (fallback)
+                grain_list = self._parse_grain_value(primary_key)
+                if grain_list:
+                    return {"grain": grain_list, "source": "entity_pk", "inferred": True}
+
+        # Priority 5: Model dimensions (INFERRED - fallback only)
         model_name = metric.get('model')
         if not model_name and entity:
             model_name = entity.get('model')
-        
+
         if model_name:
             model = self.indexer.get_model(model_name)
             if model:
                 dimensions = model.get('dimensions', [])
-                if dimensions:
-                    if isinstance(dimensions, str):
-                        try:
-                            dim_list = json.loads(dimensions)
-                            if isinstance(dim_list, list):
-                                return [str(d) for d in dim_list if d]
-                        except (json.JSONDecodeError, TypeError):
-                            pass
-                    elif isinstance(dimensions, list):
-                        return [str(d) for d in dimensions if d]
-        
-        # Final fallback: empty list (no grain constraint)
+                grain_list = self._parse_grain_value(dimensions)
+                if grain_list:
+                    return {"grain": grain_list, "source": "model_dimensions", "inferred": True}
+
+        # Final fallback: no grain
+        return {"grain": [], "source": "none", "inferred": False}
+
+    def _parse_grain_value(self, value) -> List[str]:
+        """Parse grain value from various formats to list of strings."""
+        import json
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+                if isinstance(parsed, list):
+                    return [str(d) for d in parsed if d]
+                elif parsed:
+                    return [str(parsed)]
+            except (json.JSONDecodeError, TypeError):
+                return [value] if value.strip() else []
+        elif isinstance(value, list):
+            return [str(d) for d in value if d]
         return []
+
+    def get_effective_grain(self, metric: Dict[str, Any], entity: Optional[Dict[str, Any]] = None) -> List[str]:
+        """
+        Resolve effective grain for a metric.
+
+        WARNING: This may return INFERRED grain from PK or model dimensions.
+        Use get_effective_grain_with_source() to check if grain is explicit.
+
+        Returns:
+            List of dimension names representing the metric's grain
+        """
+        result = self.get_effective_grain_with_source(metric, entity)
+        return result["grain"]
 
     def get_reachable_dimensions(self, metric_name: str) -> Dict[str, Any]:
         """

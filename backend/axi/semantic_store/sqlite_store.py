@@ -2,10 +2,10 @@
 # Usage and rights governed by backend/LICENSE.
 # Change Date: 2027-01-01. Change License: MIT.
 
+import hashlib
 import json
 import os
 import sqlite3
-import uuid
 from datetime import datetime
 from typing import Iterable, Optional
 
@@ -56,7 +56,12 @@ class SQLiteSemanticStore(SemanticStore):
         project_id: str,
         state_id: Optional[str] = None,
     ) -> SemanticState:
-        state_id = state_id or str(uuid.uuid4())
+        # Generate deterministic ID from content if not provided
+        if not state_id:
+            content_hash = hashlib.sha256(
+                f"{project_id}:{state_type}:{version}:{json.dumps(payload, sort_keys=True)}".encode()
+            ).hexdigest()[:32]
+            state_id = content_hash
         cur = self.conn.cursor()
         cur.execute(
             """

@@ -50,7 +50,7 @@ class SemanticReachability:
         models_dir = os.path.join(self.indexer.metadata_dir, "models")
         if not os.path.exists(models_dir):
             return grains
-        for fname in os.listdir(models_dir):
+        for fname in sorted(os.listdir(models_dir)):
             if not fname.endswith(".json"):
                 continue
             path = os.path.join(models_dir, fname)

@@ -419,7 +419,7 @@ class MetadataIndexer:
             # Index extracted models from JSON files
             models_dir = os.path.join(self.metadata_dir, "models")
             if os.path.exists(models_dir):
-                model_files = glob.glob(os.path.join(models_dir, "*.json"))
+                model_files = sorted(glob.glob(os.path.join(models_dir, "*.json")))
                 logger.info(f"Found {len(model_files)} model files to index")
                 for fpath in model_files:
                     try:
@@ -487,7 +487,7 @@ class MetadataIndexer:
             entity_model_map[row[0]] = row[1]
         
         # Load all YAML metric files
-        for fpath in glob.glob(os.path.join(metrics_dir, "*.yml")) + glob.glob(os.path.join(metrics_dir, "*.yaml")):
+        for fpath in sorted(glob.glob(os.path.join(metrics_dir, "*.yml")) + glob.glob(os.path.join(metrics_dir, "*.yaml"))):
             try:
                 with open(fpath, "r") as f:
                     metric_data = yaml.safe_load(f)

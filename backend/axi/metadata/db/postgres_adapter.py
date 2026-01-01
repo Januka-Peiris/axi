@@ -225,11 +225,24 @@ class PostgreSQLAdapter(DatabaseAdapter):
         placeholders = ", ".join(["%s" for _ in columns])
         column_names = ", ".join(columns)
         values = tuple(data.values())
-        
-        # Get primary key column (assume first column or 'name' for most tables)
-        pk_column = columns[0] if columns else "id"
+
+        # Determine primary key column for UPSERT conflict resolution
+        # WARNING: This is a heuristic. AXI metadata tables follow conventions:
+        # - 'name' column is PK for entities, metrics, dimensions, models
+        # - 'id' column is PK for relationship tables
+        # If the table schema changes, this logic MUST be updated.
         if "name" in columns:
             pk_column = "name"
+        elif "id" in columns:
+            pk_column = "id"
+        else:
+            # Fallback to first column - log warning as this is unreliable
+            pk_column = columns[0] if columns else "id"
+            import logging
+            logging.getLogger(__name__).warning(
+                f"UPSERT on table '{table}' using inferred PK column '{pk_column}'. "
+                "This may cause incorrect conflict resolution."
+            )
         
         sql = f"""
             INSERT INTO {table} ({column_names})

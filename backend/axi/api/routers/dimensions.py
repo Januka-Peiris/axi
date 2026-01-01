@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 from typing import List, Dict, Any, Optional
 import sqlite3
 import json
+import hashlib
 from axi.config.settings import get_settings
 from axi.metadata.indexer import MetadataIndexer
 from axi.utils.logging_config import get_logger
@@ -359,8 +360,10 @@ def get_dimension_entities(dimension_id: int):
                 result = []
                 for row in rows:
                     row_dict = dict(row)
+                    # Use deterministic hash (hashlib instead of built-in hash which has random seed)
+                    stable_id = int(hashlib.sha256(row_dict["name"].encode()).hexdigest()[:8], 16)
                     result.append({
-                        "id": hash(row_dict["name"]) % (10**9),  # Simple hash-based id
+                        "id": stable_id,
                         "name": row_dict["name"]
                     })
                 return result

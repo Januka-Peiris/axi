@@ -103,7 +103,7 @@ class SavedQueryStore:
         path = self._path_for(query.id)
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w") as f:
-            yaml.safe_dump(query.model_dump(), f, sort_keys=False)
+            yaml.safe_dump(query.model_dump(), f, sort_keys=True)
         return query
 
     def delete_query(self, query_id: str) -> bool:

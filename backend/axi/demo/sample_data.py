@@ -175,7 +175,7 @@ def generate_sample_project(output_dir: str, force: bool = False) -> dict:
         glossary_file = glossary_dir / f"{term_key}.yml"
         if glossary_file.exists() and not force:
             continue
-        glossary_file.write_text(yaml.dump(term_data, default_flow_style=False))
+        glossary_file.write_text(yaml.dump(term_data, default_flow_style=False, sort_keys=True))
         stats["glossary"] += 1
 
     # Generate axi.yml config

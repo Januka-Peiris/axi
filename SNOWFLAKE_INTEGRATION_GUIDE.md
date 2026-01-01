@@ -477,7 +477,12 @@ AXI infers FK relationships from common patterns:
 3. **Plural/Singular matching**
    - `category_id` → `categories.id` OR `category.id`
 
-Inferred constraints are stored as `INFERRED_FK` type.
+**Important**: Inferred constraints are stored with `join_type: "INFERRED_FK"`. They are:
+- Explicitly marked (never silent)
+- Not used in query generation by default
+- Opt-in for join path resolution
+
+Use `--skip-inferred` to disable inference entirely.
 
 ## Relationship Creation
 
@@ -803,8 +808,3 @@ For issues or questions:
 - Documentation: https://github.com/mshdata/axi/docs
 - Examples: `./examples/snowflake/`
 
----
-
-**Last Updated**: 2025-12-18
-**AXI Version**: 0.3.0+
-**Snowflake Support**: ✅ Production Ready

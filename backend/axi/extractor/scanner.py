@@ -49,18 +49,19 @@ class SqlScanner:
         excludes = {"target", "dbt_packages", "logs", "macros", "tests", "hooks", "snapshots", "analysis", "__pycache__", ".git"}
         
         try:
-            self._debug(f"Contents of SQL root: {os.listdir(self.sql_root)}")
+            self._debug(f"Contents of SQL root: {sorted(os.listdir(self.sql_root))}")
         except Exception:
             pass
 
         for root, dirs, files in os.walk(self.sql_root):
-            # Filter directories
-            dirs[:] = [
+            # Filter directories and sort for deterministic ordering
+            dirs[:] = sorted([
                 d for d in dirs
                 if d not in excludes
                 and not d.startswith(".")
                 and not d.endswith(".yml")  # avoid dbt_project.yml dirs/symlinks
-            ]
+            ])
+            files = sorted(files)  # Ensure deterministic file ordering
             
             self._debug(f"Scanning directory: {root}")
 
@@ -101,14 +102,14 @@ class SqlScanner:
                 for comp_root in self.compiled_roots:
                     compiled_candidates.append(os.path.join(comp_root, rel_path))
                     compiled_candidates.extend(
-                        glob.glob(os.path.join(comp_root, "**", rel_path), recursive=True)
+                        sorted(glob.glob(os.path.join(comp_root, "**", rel_path), recursive=True))
                     )
 
                 # Default compiled locations relative to sql_root
                 if self.project_name:
                     compiled_candidates.append(os.path.join(self.sql_root, "target", "compiled", self.project_name, rel_path))
                 compiled_candidates.append(os.path.join(self.sql_root, "target", "compiled", rel_path))
-                compiled_candidates.extend(glob.glob(os.path.join(self.sql_root, "target", "compiled", "**", rel_path), recursive=True))
+                compiled_candidates.extend(sorted(glob.glob(os.path.join(self.sql_root, "target", "compiled", "**", rel_path), recursive=True)))
                 self._debug(f"[CHECK] compiled candidates: {compiled_candidates}")
 
                 for compiled_path in compiled_candidates:

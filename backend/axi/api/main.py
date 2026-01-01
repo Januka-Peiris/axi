@@ -507,7 +507,10 @@ def _local_subgraph(node_id: str, depth: int, indexer):
             if nbr not in visited:
                 visited.add(nbr)
                 q.append((nbr, d + 1))
-    return {"nodes": list(sub_nodes.values()), "edges": sub_edges}
+    # Sort nodes by id for deterministic ordering
+    sorted_nodes = sorted(sub_nodes.values(), key=lambda n: n.get("id", ""))
+    sorted_edges = sorted(sub_edges, key=lambda e: (e.get("from", ""), e.get("to", "")))
+    return {"nodes": sorted_nodes, "edges": sorted_edges}
 
 # Removed duplicate endpoints - using SemanticGraph-based implementations below
 

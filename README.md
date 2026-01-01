@@ -1,131 +1,201 @@
-AXI: The Open Source Semantic Layer
-SQL -> Metrics | Dimensions | Entities | Relationships | Glossary | Semantic SQL
+# AXI
 
-AXI is a headless, open-source semantic layer that turns SQL models into business-ready concepts (metrics, dimensions, entities, relationships, and a business glossary) and generates optimized, join-aware SQL for any downstream tool. It is warehouse-native, dbt-aware, Snowflake-friendly, and requires zero DSL.
+A semantic compiler for analytics.
 
-## Why AXI
-- Repeated SQL logic across BI tools, notebooks, and apps.
-- Metric inconsistency between teams.
-- No single semantic truth across dbt models and BI definitions.
+AXI extracts semantic metadata (metrics, dimensions, entities, relationships, grain) from SQL models. It is SQL-first, dbt-first, and requires no DSL. Warehouses are optional.
 
-## What AXI Does
-- Extracts metrics, dimensions, entities, relationships, filters, tags, and descriptions from SQL.
-- Infers join paths and generates optimized, join-aware SQL (Snowflake-aware).
-- Builds a business glossary and materialized semantic marts with caching.
-- Integrates deeply with dbt Core and ships a Semantic Explorer UI.
-- Result: define once, query everywhere.
+## What AXI Is
 
-## Architecture
+AXI is a **semantic compiler**, not a BI tool. It:
+
+- Parses SELECT statements from dbt compiled SQL or raw `.sql` files
+- Extracts metrics (aggregations), dimensions (GROUP BY columns), entities, and relationships (JOINs)
+- Generates join-aware SQL for downstream consumption
+- Produces deterministic, versioned metadata artifacts
+
+**Primary input**: Compiled SQL from dbt projects (or raw SQL files)
+**Primary output**: JSON metadata files with schema versioning
+
+## What AXI Is NOT
+
+- **Not a BI tool** — AXI does not visualize data. Use Looker, Tableau, or Metabase for dashboards.
+- **Not an AI analyst** — AXI does not interpret business intent or generate insights.
+- **Not an inference engine** — AXI does not guess semantics. Ambiguous structures are flagged, not resolved.
+- **Not a warehouse scanner** — AXI reads SQL files, not database catalogs. Warehouse connections are optional enrichment only.
+- **Not a metric store** — AXI extracts metadata; it does not execute queries or cache results.
+
+## Core Guarantees
+
+### Determinism
+
+Same inputs produce byte-identical outputs. AXI guarantees:
+- Sorted iteration of files and data structures
+- No random IDs or timestamps in semantic artifacts
+- Reproducible metadata across runs and environments
+
+### No Silent Inference
+
+AXI does not guess semantics. When relationships or grain cannot be explicitly determined from SQL:
+- The condition is flagged (e.g., `grain_status: "not_detected"`)
+- The model may be skipped with an explicit reason
+- No default values are silently applied
+
+### CI-Safe Exit Codes
+
+AXI uses strict exit codes for CI/CD integration:
+
+| Code | Name | Meaning |
+|------|------|---------|
+| 0 | SUCCESS | All items processed without error |
+| 1 | GENERAL_ERROR | Unexpected runtime failure |
+| 2 | CONFIG_ERROR | Invalid configuration |
+| 3 | VALIDATION_ERROR | Invalid input (bad SQL syntax) |
+| 4 | NOT_FOUND | Required resource not found |
+| 5 | EXTRACTION_ERROR | One or more items failed |
+| 6 | CONNECTION_ERROR | Database/warehouse connection failed |
+
+**Important**: Exit code 5 includes partial success scenarios. If 95 of 100 models succeed and 5 fail, AXI returns exit code 5. CI/CD should treat this as failure—the metadata may be incomplete.
+
+### Explicit Failure Reporting
+
+Every extraction run produces a summary with explicit counts:
+- `scanned`: Total models found
+- `processed`: Successfully extracted
+- `skipped`: Excluded by rules or lacking semantic content
+- `failed`: Parse errors or extraction failures
+
+Use `--summary <file>` to write machine-readable JSON for CI/CD integration.
+
+## Inferred Semantics
+
+AXI performs limited inference in specific cases. All inferred semantics are:
+
+1. **Explicitly marked** — Inferred relationships have `join_type: "INFERRED_FK"`. Inferred grain has `source: "entity_pk"` or `source: "model_dimensions"`.
+2. **Non-default** — Inferred semantics are not used in query generation unless explicitly requested.
+3. **Opt-in to use** — Query operations that would rely on inferred relationships require explicit acknowledgment.
+
+Inference occurs only for:
+- FK relationships from `_id` column naming conventions (marked `INFERRED_FK`)
+- Grain from entity primary keys when not explicitly defined (marked `inferred: true`)
+
+**AXI will never**:
+- Infer metric definitions
+- Guess business meaning from column names
+- Auto-generate joins without explicit SQL evidence
+- Silently act on inferred relationships
+
+## Typical Workflow
+
 ```
-graph LR
-    DW[(Warehouse\nSnowflake/PG)] --> AXI[AXI Core\nSemantic Engine]
-    AXI --> API[FastAPI Server]
-    AXI --> CLI[CLI Tool]
-    API --> UI[Semantic Explorer]
-    API --> BI[BI Tools]
-    API --> NB[Notebooks]
-    AXI --> Docs[Glossary & Semantic Output]
+dbt project
+    │
+    ▼
+dbt compile
+    │
+    ▼
+target/compiled/*.sql
+    │
+    ▼
+axi extract
+    │
+    ▼
+metadata_store/models/*.json
 ```
+
+No warehouse connection is required for extraction. The workflow is:
+
+1. Write dbt models with SQL aggregations and JOINs
+2. Run `dbt compile` to generate compiled SQL
+3. Run `axi extract` to parse SQL and produce metadata
+4. Optionally run `axi ui` to explore the semantic graph
 
 ## Quick Start
-1) Install the CLI
-`pip install axi-cli`
 
-2) Run the demo project
-```
-axi extract examples/demo
+```bash
+# Install
+pip install axi-cli
+
+# Extract from a dbt project (after dbt compile)
+cd /path/to/dbt/project
+axi extract
+
+# Or extract from raw SQL
+axi extract /path/to/sql/files
+
+# View results
 axi metrics list
-axi query --metric total_revenue --dims customer_id
 axi ui
 ```
-Then open http://localhost:5173.
 
-## Developer Setup
-Install everything with a single command from the project root:
+## CLI Reference
+
 ```bash
+# Extraction
+axi extract [path]              # Extract metadata from SQL
+axi extract --dry-run           # Validate without writing
+axi extract --debug             # Verbose logging
+axi extract --summary out.json  # Write machine-readable summary
+axi extract --quiet             # Suppress non-error output
+
+# Inspection
+axi metrics list                # List extracted metrics
+axi query --metric <name>       # Generate SQL for a metric
+
+# UI
+axi ui                          # Start Semantic Explorer
+```
+
+## SQL Dialect Support
+
+AXI uses sqlglot for SQL parsing. See [DIALECTS.md](DIALECTS.md) for:
+- Supported dialects (Snowflake, PostgreSQL, generic SQL)
+- Explicitly unsupported features
+- Parse failure behavior
+
+## Configuration
+
+Create `axi.yml` in your project root:
+
+```yaml
+# Promotion rules (which models to extract)
+include:
+  folders: ["models/marts/**"]
+  tags: ["axi"]
+
+exclude:
+  folders: ["models/staging/**"]
+  tags: []
+
+# dbt integration
+dbt:
+  compiled_path: "./target/compiled"
+```
+
+See [backend/axi/config/README.md](backend/axi/config/README.md) for full configuration reference.
+
+## Project Structure
+
+```
+backend/    # Semantic engine (BSL 1.1)
+axi-cli/    # CLI tool (MIT)
+frontend/   # Semantic Explorer UI (MIT)
+examples/   # Demo project
+```
+
+## Development
+
+```bash
+# Install all packages
 make install
-```
-This installs:
-- Backend package (`axi-semantic`) in editable mode
-- CLI package (`axi-cli`) in editable mode
-- Frontend dependencies
 
-**Manual Installation** (if you prefer step-by-step):
-```bash
-# Install build tools
-python -m pip install --upgrade pip hatchling
-
-# Install backend and CLI packages
-python -m pip install -e backend
-python -m pip install -e axi-cli
-
-# Install frontend dependencies
-cd frontend && npm install
-```
-
-**Development Commands:**
-```bash
-# Start both backend and frontend
+# Run backend + frontend
 make dev
-
-# Or start individually
-make backend    # API on http://localhost:8000
-make frontend   # UI on http://localhost:5173
 
 # Run tests
 make test
-
-# Clean build artifacts
-make clean
-
-# See all available commands
-make help
 ```
-
-Customize ports with environment variables:
-```bash
-BACKEND_PORT=9000 FRONTEND_PORT=3000 make dev
-```
-
-## Feature Highlights
-- Semantic extraction (no DSL): metrics, dimensions, grain, entities, relationships, filters, tags, descriptions.
-- Metrics layer: simple, ratios (safe TRY_DIVIDE), semi-additive, derived, time intelligence (previous period, rolling, to-date).
-- Semantic query engine: join-aware SQL generation (`axi query --metric mrr --dims customers.region`), optimized JOINs, group-by logic, Snowflake SQL (IFF, TRY_DIVIDE, QUALIFY).
-- dbt integration: loads manifest.json, ingests models/sources/tests, extracts constraints from unique/not_null, enriches the semantic graph with lineage.
-- Snowflake integration: table/column metadata, PK/FK constraints, tags, masking/row access policies, ACCOUNT_USAGE lineage, Snowflake-optimized SQL.
-- Business glossary: entities, attributes, metrics, dimensions, relationships derived from SQL plus dbt metadata.
-- Caching and semantic marts: query caching, materialized metric tables, multi-metric marts, full and incremental refresh.
-- Semantic Explorer UI: React UI for metrics, dimensions, entities, models, semantic graph, glossary, SQL preview, and query runner.
-
-## Project Structure
-- backend/  - Semantic Engine (BSL)
-- axi-cli/  - CLI tools (MIT)
-- frontend/ - UI (MIT)
-- examples/ - Demo project
-- docker/   - Docker Compose support
-
-## Run with Docker
-```
-docker-compose up --build
-```
-Starts API (FastAPI), UI (Vite/React), PostgreSQL database, and demo metadata.
-
-**Database Options:**
-- **SQLite (default)**: Embedded database, no setup required. Perfect for local development.
-- **PostgreSQL**: Server database for production. Configure via environment variables in `docker/compose.yaml`.
-
-See `backend/axi/config/README.md` for detailed database configuration options.
-
-## Documentation
-Documentation lives in a separate repo: https://github.com/your-org/axi-docs
-(Hosted site link coming soon.)
-
-## AXI Cloud
-Managed AXI with multi-tenant projects, environments (dev/staging/prod), scheduled refresh, snapshotting, semantic and warehouse lineage, query caching, semantic marts, and SSO/RBAC. Cloud runs AXI OSS under the hood.
-
-## Contributing
-We welcome contributions. See CONTRIBUTING.md.
 
 ## Licensing
-- Backend (axi-semantic): Business Source License (BSL 1.1). Free/commercial use, modification, redistribution; prohibits offering AXI as a competing hosted service. Automatic Change Date: 2027-01-01 (becomes MIT afterward).
-- CLI, UI, examples, docs: MIT. See respective LICENSE files for terms.
+
+- **Backend** (`axi-semantic`): Business Source License 1.1. Free for use; prohibits offering AXI as a competing hosted service. Converts to MIT on 2027-01-01.
+- **CLI, UI, examples**: MIT.
