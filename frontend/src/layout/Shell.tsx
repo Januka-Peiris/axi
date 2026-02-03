@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, Database, BarChart3, Layers, Terminal, Settings, BookOpen, Bookmark, GitFork, Command, Search } from 'lucide-react';
+import { LayoutDashboard, Database, BarChart3, Layers, Terminal, Settings, BookOpen, Bookmark, GitFork, Command, Search, TrendingUp } from 'lucide-react';
 import clsx from 'clsx';
 import { CommandPalette } from '../components/CommandPalette';
 
@@ -66,6 +66,7 @@ export const Shell: React.FC<{ children?: React.ReactNode }> = ({ children }) =>
                     <div className="px-4 py-2 text-xs font-bold text-slate-600 uppercase tracking-widest mt-6 mb-2">Tools</div>
                     <NavItem to="/saved-queries" icon={Bookmark} label="Saved Queries" />
                     <NavItem to="/query" icon={Terminal} label="SQL Runner" />
+                    <NavItem to="/roi" icon={TrendingUp} label="Adoption & ROI" />
 
                     <div className="pt-4 mt-2 border-t border-white/10">
                         <div className="px-3 mb-2 text-xs font-bold text-slate-500 uppercase tracking-wider">Resources</div>

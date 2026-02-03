@@ -106,6 +106,19 @@ class AXISettings(BaseSettings):
         default=None,
         description="Database password (for PostgreSQL, use env: syntax in config)"
     )
+
+    # ROI / usage (config-driven; no BI-tool logic)
+    roi_hours_saved_per_query: float = Field(
+        default=0.1,
+        ge=0.0,
+        description="Estimated analyst hours saved per AXI-matched query (for ROI summary)"
+    )
+
+    # Contract enforcement: strict (hard-fail on violations) or warn (emit warnings, allow compile)
+    contract_enforcement_mode: Literal["warn", "strict"] = Field(
+        default="strict",
+        description="Contract enforcement: strict (fail compile/deploy on violation) or warn (log and allow)"
+    )
     
     @field_validator('metadata_dir', mode='before')
     @classmethod

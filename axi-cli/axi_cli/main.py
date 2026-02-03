@@ -31,7 +31,9 @@ app = typer.Typer(
 
 from axi.config.settings import get_settings
 from axi.config.env_loader import load_env_file
+from axi.exceptions import AXIBaseException, DeploymentValidationError
 from .scaffold import scaffold_project
+from .error_format import format_axi_error, format_deployment_validation_error
 from .generate import generate_metric, generate_dimension, generate_glossary, generate_rule_promotion
 from axi.semantic_store.factory import get_semantic_store
 from axi.glossary.term_store import GlossaryTermStore
@@ -524,6 +526,268 @@ def version():
         "backend": backend_version
     }, indent=2))
 
+# Deploy governed semantic views (SQL-first; no execution engine)
+deploy_app = typer.Typer(help="Deploy governed semantic views (generate CREATE VIEW SQL; no execution)")
+
+@deploy_app.command("views")
+def deploy_views(
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show plan and SQL only; do not record state"),
+    record_state: bool = typer.Option(False, "--record-state", help="Record deployed view state in AXI metadata (use after applying SQL)"),
+    schema: str = typer.Option("axi", "--schema", "-s", help="Schema name for views (e.g. axi)"),
+    warehouse: str = typer.Option("snowflake", "--warehouse", "-w", help="Warehouse dialect (snowflake)"),
+    version_coexistence: bool = typer.Option(False, "--version-coexistence", help="Name views with version suffix for coexistence"),
+    contract_mode: Optional[str] = typer.Option(None, "--contract-mode", help="Contract enforcement: warn | strict (overrides axi.yml)"),
+):
+    """
+    Plan deployment of metric views: generate CREATE VIEW SQL per metric.
+    Use --dry-run to show plan and SQL without recording deployment state.
+    Use --record-state after manually applying SQL to persist deployment state for conflict detection.
+    No execution engine: SQL is copy-pasteable for manual or CI execution.
+    """
+    from axi.views.planner import DeploymentPlanner
+    from axi.exceptions import DeploymentValidationError
+
+    # Resolve contract mode: CLI flag > axi.yml > env/settings
+    resolved_contract_mode: Optional[str] = None
+    if contract_mode is not None:
+        cm = (contract_mode or "").strip().lower()
+        if cm not in ("warn", "strict"):
+            typer.echo(f"Invalid --contract-mode '{contract_mode}'; use warn or strict.", err=True)
+            raise typer.Exit(1)
+        resolved_contract_mode = cm
+    else:
+        cwd = os.getcwd()
+        project_root = cwd
+        current = cwd
+        while current != os.path.dirname(current):
+            if os.path.exists(os.path.join(current, "axi.yml")) or os.path.exists(os.path.join(current, "dbt_project.yml")):
+                project_root = current
+                break
+            current = os.path.dirname(current)
+        config_path = os.path.join(project_root, "axi.yml")
+        if os.path.exists(config_path):
+            config = load_config(config_path)
+            resolved_contract_mode = getattr(config, "contract_enforcement", None) or "strict"
+        if resolved_contract_mode is None:
+            resolved_contract_mode = get_settings().contract_enforcement_mode
+
+    indexer = MetadataIndexer(METADATA_DIR)
+    planner = DeploymentPlanner(
+        indexer,
+        schema=schema,
+        warehouse=warehouse,
+        replace_existing=True,
+        version_coexistence=version_coexistence,
+        contract_mode=resolved_contract_mode,
+    )
+    try:
+        plan = planner.plan()
+    except DeploymentValidationError as e:
+        typer.echo(format_deployment_validation_error(e), err=True)
+        raise typer.Exit(1)
+
+    for w in plan.warnings:
+        typer.echo(f"WARNING: {w}", err=True)
+
+    if dry_run:
+        typer.echo("[DRY-RUN] Deployment plan (no state will be written):")
+        typer.echo(f"  Create: {len(plan.create)} view(s)")
+        typer.echo(f"  Replace: {len(plan.replace)} view(s)")
+        typer.echo(f"  Drop (deprecated): {len(plan.drop)} view(s)")
+        for a in plan.create:
+            typer.echo(f"\n--- CREATE {a.view_name} ---")
+            typer.echo(a.sql or "")
+        for a in plan.replace:
+            typer.echo(f"\n--- REPLACE {a.view_name} ---")
+            typer.echo(a.sql or "")
+        for a in plan.drop:
+            typer.echo(f"\n--- DROP {a.view_name} ---")
+            typer.echo(a.sql or "")
+        return
+
+    typer.echo(f"Plan: create={len(plan.create)}, replace={len(plan.replace)}, drop={len(plan.drop)}")
+    for a in plan.create + plan.replace:
+        typer.echo(f"\n--- {a.action.upper()} {a.view_name} ---")
+        typer.echo(a.sql or "")
+    for a in plan.drop:
+        typer.echo(f"\n--- DROP {a.view_name} ---")
+        typer.echo(a.sql or "")
+    typer.echo("\n(No execution engine: run the SQL above in your warehouse to deploy.)")
+    
+    if record_state:
+        from datetime import datetime, timezone
+        from axi.views.deployment_validation import hash_view_definition, _extract_view_body_from_ddl
+        
+        typer.echo("\n[RECORDING STATE]")
+        deployed_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        
+        for a in plan.create + plan.replace:
+            body = _extract_view_body_from_ddl(a.sql or "")
+            definition_hash = hash_view_definition(body)
+            indexer.record_deployed_view(
+                view_name=a.view_name,
+                metric_name=a.metric_name,
+                metric_version=a.metric_version,
+                schema_name=schema,
+                deployed_at_utc=deployed_at,
+                deprecated=a.deprecated,
+                definition_hash=definition_hash,
+            )
+            typer.echo(f"  ✓ Recorded deployment state for {a.view_name}")
+        
+        for a in plan.drop:
+            indexer.remove_deployed_view(a.view_name)
+            typer.echo(f"  ✓ Removed deployment state for {a.view_name}")
+        
+        typer.echo(f"\nDeployment state persisted. Conflict detection and drop_deprecated now available.")
+
+app.add_typer(deploy_app, name="deploy")
+
+drop_app = typer.Typer(help="Drop views (plan only; no execution)")
+
+@drop_app.command("deprecated")
+def drop_deprecated(
+    schema: str = typer.Option("axi", "--schema", "-s", help="Schema filter (optional)"),
+):
+    """
+    Plan dropping deprecated views: generate DROP VIEW IF EXISTS SQL.
+    No execution: SQL is copy-pasteable.
+    """
+    from axi.views.planner import DeploymentPlanner
+
+    indexer = MetadataIndexer(METADATA_DIR)
+    planner = DeploymentPlanner(indexer, schema=schema or "axi")
+    plan = planner.plan_drop_deprecated()
+
+    if not plan.drop:
+        typer.echo("No deprecated views in deployment state.")
+        return
+    typer.echo(f"Deprecated views to drop: {len(plan.drop)}")
+    for a in plan.drop:
+        typer.echo(f"\n--- DROP {a.view_name} ---")
+        typer.echo(a.sql or "")
+    typer.echo("\n(No execution engine: run the SQL above to drop.)")
+
+app.add_typer(drop_app, name="drop")
+
+# Metric versioning and deprecation
+promote_app = typer.Typer(help="Promote metrics (version bump)")
+@promote_app.command("metric")
+def promote_metric(
+    name: str = typer.Argument(..., help="Metric name"),
+    version: Optional[str] = typer.Option(None, "--version", "-v", help="New version (e.g. 1.1); required for breaking changes"),
+):
+    """
+    Promote a metric: set status active and optionally bump version.
+    Use --version when making breaking changes (expression, grain, dimensions, aggregation, model).
+    """
+    from axi.metrics.versioning import is_breaking_change, version_compare
+    indexer = MetadataIndexer(METADATA_DIR)
+    existing = indexer.get_metric(name)
+    if not existing:
+        typer.echo(f"Metric '{name}' not found.", err=True)
+        raise typer.Exit(exit_codes.NOT_FOUND)
+    indexer.update_metric_version_status(name, status="active")
+    if version:
+        indexer.update_metric_version_status(name, version=version)
+        typer.echo(f"Promoted metric '{name}' to version {version}.")
+    else:
+        typer.echo(f"Promoted metric '{name}' (status active, version unchanged: {existing.get('version', '1.0')}).")
+
+app.add_typer(promote_app, name="promote")
+
+deprecate_app = typer.Typer(help="Deprecate metrics")
+@deprecate_app.command("metric")
+def deprecate_metric(
+    name: str = typer.Argument(..., help="Metric name"),
+    replacement: Optional[str] = typer.Option(None, "--replacement", "-r", help="Replacement metric name"),
+    date: Optional[str] = typer.Option(None, "--date", "-d", help="Deprecation date (YYYY-MM-DD)"),
+):
+    """
+    Deprecate a metric: set status deprecated, optional replacement and date.
+    """
+    indexer = MetadataIndexer(METADATA_DIR)
+    existing = indexer.get_metric(name)
+    if not existing:
+        typer.echo(f"Metric '{name}' not found.", err=True)
+        raise typer.Exit(exit_codes.NOT_FOUND)
+    indexer.update_metric_version_status(
+        name,
+        status="deprecated",
+        deprecation_date=date,
+        replacement_metric=replacement,
+    )
+    typer.echo(f"Deprecated metric '{name}'." + (f" Replacement: {replacement}." if replacement else ""))
+
+app.add_typer(deprecate_app, name="deprecate")
+
+diff_app = typer.Typer(help="Diff metrics")
+@diff_app.command("metrics")
+def diff_metrics_cmd(
+    name1: str = typer.Argument(..., help="First metric name"),
+    name2: str = typer.Argument(..., help="Second metric name (or same as name1 to diff versions)"),
+    version1: Optional[str] = typer.Option(None, "--version1", "-v1", help="First metric version from history (e.g. 1.0)"),
+    version2: Optional[str] = typer.Option(None, "--version2", "-v2", help="Second metric version from history (e.g. 1.1)"),
+):
+    """
+    Show human-readable diff between two metrics. Uses persisted history when --version1/--version2 are given.
+    """
+    from axi.metrics.versioning import diff_metrics as do_diff
+    indexer = MetadataIndexer(METADATA_DIR)
+    if version1:
+        rec1 = indexer.get_metric_version_record(name1, version1)
+        if not rec1:
+            typer.echo(f"Metric '{name1}' version '{version1}' not found in history.", err=True)
+            raise typer.Exit(exit_codes.NOT_FOUND)
+        m1 = rec1["definition_snapshot"]
+        label1 = f"{name1}@{version1}"
+    else:
+        m1 = indexer.get_metric(name1)
+        if not m1:
+            typer.echo(f"Metric '{name1}' not found.", err=True)
+            raise typer.Exit(exit_codes.NOT_FOUND)
+        label1 = name1
+    if version2:
+        rec2 = indexer.get_metric_version_record(name2, version2)
+        if not rec2:
+            typer.echo(f"Metric '{name2}' version '{version2}' not found in history.", err=True)
+            raise typer.Exit(exit_codes.NOT_FOUND)
+        m2 = rec2["definition_snapshot"]
+        label2 = f"{name2}@{version2}"
+    else:
+        m2 = indexer.get_metric(name2)
+        if not m2:
+            typer.echo(f"Metric '{name2}' not found.", err=True)
+            raise typer.Exit(exit_codes.NOT_FOUND)
+        label2 = name2
+    typer.echo(do_diff(m1, m2, name_a=label1, name_b=label2))
+
+app.add_typer(diff_app, name="diff")
+
+# Usage tracking: Snowflake QUERY_HISTORY ingestion (read-only)
+usage_app = typer.Typer(help="Usage tracking (read-only warehouse access)")
+@usage_app.command("ingest-snowflake")
+def usage_ingest_snowflake(
+    days: int = typer.Option(7, "--days", "-d", help="Last N days of QUERY_HISTORY (max 7 for INFORMATION_SCHEMA)"),
+    limit: int = typer.Option(10000, "--limit", "-l", help="Max rows to fetch and match"),
+):
+    """
+    Ingest Snowflake QUERY_HISTORY, match to AXI fingerprints, update metric_usage.
+    Read-only. Run on a schedule (e.g. cron) to keep usage up to date.
+    """
+    from axi.usage.snowflake_ingest import ingest_snowflake_usage
+    indexer = MetadataIndexer(METADATA_DIR)
+    try:
+        runner = SnowflakeRunner()
+    except ValueError as e:
+        typer.echo(f"Snowflake credentials required: {e}", err=True)
+        raise typer.Exit(exit_codes.CONNECTION_ERROR)
+    typer.echo(f"Ingesting QUERY_HISTORY (last {days} days, limit {limit})...")
+    matched = ingest_snowflake_usage(indexer, runner, days_back=days, result_limit=limit)
+    typer.echo(f"Matched {matched} query log rows to AXI metrics.")
+
+app.add_typer(usage_app, name="usage")
+
 @glossary_app.command("list")
 def glossary_list():
     """
@@ -569,8 +833,11 @@ def glossary_create(
             notes=notes,
         )
         typer.echo(json.dumps(t.model_dump(), indent=2, default=str))
+    except AXIBaseException as e:
+        typer.echo(format_axi_error(e), err=True)
+        raise typer.Exit(1)
     except Exception as e:
-        typer.echo(f"Error: {e}")
+        typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1)
 
 @glossary_app.command("edit")
@@ -602,8 +869,11 @@ def glossary_edit(
             notes=notes,
         )
         typer.echo(json.dumps(t.model_dump(), indent=2, default=str))
+    except AXIBaseException as e:
+        typer.echo(format_axi_error(e), err=True)
+        raise typer.Exit(1)
     except Exception as e:
-        typer.echo(f"Error: {e}")
+        typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1)
 
 @glossary_app.command("deprecate")
@@ -614,8 +884,11 @@ def glossary_deprecate(term: str):
     try:
         t = term_store.deprecate_term(term)
         typer.echo(json.dumps(t.model_dump(), indent=2, default=str))
+    except AXIBaseException as e:
+        typer.echo(format_axi_error(e), err=True)
+        raise typer.Exit(1)
     except Exception as e:
-        typer.echo(f"Error: {e}")
+        typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1)
 
 # Semantic drift check (advisory)
@@ -772,8 +1045,12 @@ def metrics_sql(
         else:
             sql = engine.generate_sql(metric, dim_list, filter_list, dialect, compare, window, optimize=optimize)
             typer.echo(sql)
+    except AXIBaseException as e:
+        typer.echo(format_axi_error(e), err=True)
+        raise typer.Exit(1)
     except Exception as e:
-        typer.echo(f"Error: {e}")
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
 
 @metrics_app.command("deps")
 def metrics_deps(metric: str):
@@ -1159,9 +1436,12 @@ def query(
                 typer.echo("... (truncated)")
         else:
             typer.echo(sql)
-            
+    except AXIBaseException as e:
+        typer.echo(format_axi_error(e), err=True)
+        raise typer.Exit(1)
     except Exception as e:
-        typer.echo(f"Error: {e}")
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
 
 @app.command()
 def ui(

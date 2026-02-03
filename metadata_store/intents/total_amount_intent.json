@@ -1,0 +1,22 @@
+{
+  "metric_name": "total_amount",
+  "metric_version": "1.0",
+  "base_entity": "orders",
+  "grain": [],
+  "measures": [
+    {
+      "name": "total_amount",
+      "column_ref": "amount",
+      "aggregation": "sum"
+    }
+  ],
+  "dimensions": [
+    "amount",
+    "customer_id",
+    "id",
+    "status"
+  ],
+  "time_dimension": null,
+  "filters": [],
+  "join_path": []
+}

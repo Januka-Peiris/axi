@@ -1,0 +1,22 @@
+{
+  "metric_name": "order_count",
+  "metric_version": "1.0",
+  "base_entity": "orders",
+  "grain": [],
+  "measures": [
+    {
+      "name": "order_count",
+      "column_ref": "*",
+      "aggregation": "count"
+    }
+  ],
+  "dimensions": [
+    "amount",
+    "customer_id",
+    "id",
+    "status"
+  ],
+  "time_dimension": null,
+  "filters": [],
+  "join_path": []
+}

@@ -2,7 +2,22 @@ import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowUpDown, ArrowUp, ArrowDown, Search, BarChart3, Loader2, Plus } from 'lucide-react';
 import { useMetrics } from './api/getMetrics';
+import type { MetricStatus } from './api/getMetrics';
 import { MetricBuilder } from './components/MetricBuilder';
+
+const StatusBadge: React.FC<{ status: MetricStatus }> = ({ status }) => {
+  const styles =
+    status === 'active'
+      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+      : status === 'deprecated'
+        ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+        : 'bg-red-500/10 text-red-400 border-red-500/20';
+  return (
+    <span className={`px-2 py-0.5 rounded border text-xs font-medium capitalize ${styles}`}>
+      {status}
+    </span>
+  );
+};
 
 type SortField = 'name' | 'entity_name' | 'type';
 type SortDirection = 'asc' | 'desc';
@@ -202,6 +217,8 @@ export const MetricsListPage: React.FC = () => {
                       <SortIcon field="type" activeField={sortField} direction={sortDirection} />
                     </button>
                   </th>
+                  <th className="p-4 font-semibold text-slate-300">Version</th>
+                  <th className="p-4 font-semibold text-slate-300">Status</th>
                   <th className="p-4 font-semibold text-slate-300">Expression</th>
                   <th className="p-4 font-semibold text-slate-300">Default Dimensions</th>
                   <th className="p-4 font-semibold text-slate-300">Description</th>
@@ -211,7 +228,7 @@ export const MetricsListPage: React.FC = () => {
               <tbody className="divide-y divide-white/5">
                 {filteredAndSorted.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-8 text-center text-slate-500 italic">
+                    <td colSpan={9} className="p-8 text-center text-slate-500 italic">
                       No metrics found
                     </td>
                   </tr>
@@ -226,6 +243,12 @@ export const MetricsListPage: React.FC = () => {
                         <span className="px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20 text-xs font-mono">
                           {metric.type}
                         </span>
+                      </td>
+                      <td className="p-4 text-slate-400 font-mono text-sm">
+                        {metric.version ?? '1.0'}
+                      </td>
+                      <td className="p-4">
+                        <StatusBadge status={metric.status ?? 'active'} />
                       </td>
                       <td className="p-4 text-slate-400 font-mono text-xs max-w-xs">
                         {truncate(metric.expression)}

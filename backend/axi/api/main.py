@@ -63,6 +63,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from axi.api.error_handlers import register_axi_exception_handlers
+register_axi_exception_handlers(app)
+
 @app.get("/")
 def health_check():
     return {"status": "ok", "service": "AXI Semantic Layer"}
@@ -80,6 +83,7 @@ from axi.api.routers import metrics
 from axi.api.routers import query
 from axi.api.routers import promotion
 from axi.api.routers import saved_queries
+from axi.api.routers import roi
 
 plugin_loader = PluginLoader(["./plugins", os.path.expanduser("~/.axi/plugins")])
 plugin_loader.load_plugins()
@@ -90,6 +94,7 @@ app.include_router(metrics.router)
 app.include_router(query.router)
 app.include_router(promotion.router)
 app.include_router(saved_queries.router)
+app.include_router(roi.router)
 
 for router in API_ROUTERS_REGISTRY:
     app.include_router(router)

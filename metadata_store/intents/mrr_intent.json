@@ -1,0 +1,34 @@
+{
+  "metric_name": "mrr",
+  "metric_version": "1.0",
+  "base_entity": "revenue",
+  "grain": [],
+  "measures": [
+    {
+      "name": "mrr",
+      "column_ref": "o.amount",
+      "aggregation": "sum"
+    }
+  ],
+  "dimensions": [
+    "c.region"
+  ],
+  "time_dimension": null,
+  "filters": [
+    {
+      "type": "simple",
+      "dimension": "o.status",
+      "op": "=",
+      "value": "active"
+    }
+  ],
+  "join_path": [
+    {
+      "from_entity": "orders",
+      "to_entity": "customers",
+      "from_column": "customer_id",
+      "to_column": "id",
+      "join_type": "inner"
+    }
+  ]
+}

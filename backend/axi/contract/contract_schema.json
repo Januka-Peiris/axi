@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AXI SQL Contract for BI Tools",
+  "description": "Machine-readable contract ensuring AXI-generated SQL works as custom SQL, derived table, or view definition across BI tools. No session state, no temp tables, no stored procedures, no SELECT * in metric output.",
+  "version": "1.1",
+  "runnable_as": ["custom_sql", "derived_table", "view_definition"],
+  "allowed_sql_patterns": [
+    "Single SELECT with optional WHERE, GROUP BY",
+    "FROM <table> [AS alias] with optional JOINs",
+    "Aggregate expressions (SUM, COUNT, AVG, MIN, MAX)",
+    "Column references and aliases",
+    "AXI metadata as SQL comments only (no executable impact)"
+  ],
+  "disallowed_patterns": [
+    {
+      "id": "no_session_state",
+      "description": "No session state (USE, SET, ALTER SESSION, session variables)",
+      "keywords": ["USE ", "SET ", "SET @", "SETVAR", "VARIABLE ", "SESSION ", "ALTER SESSION", "ALTER SESSION SET"],
+      "regex": "(?i)\\b(USE\\s+\\w+|SET\\s+\\w+|SET\\s+@|ALTER\\s+SESSION|SESSION\\s+\\w+\\s*=)"
+    },
+    {
+      "id": "no_temp_tables",
+      "description": "No temporary tables, temp views, or table variables",
+      "keywords": ["CREATE TEMP", "CREATE TEMPORARY", "TEMP TABLE", "TEMPORARY TABLE", "TEMP VIEW", "TEMPORARY VIEW", "INTO #", "DECLARE @", "TABLE VARIABLE"],
+      "regex": "(?i)(CREATE\\s+(TEMP|TEMPORARY)\\s+(TABLE|VIEW)|INTO\\s+#\\w+|DECLARE\\s+@\\w+\\s+TABLE)"
+    },
+    {
+      "id": "no_stored_procedures",
+      "description": "No stored procedure or function execution (CALL, EXEC, EXECUTE)",
+      "keywords": ["CALL ", "EXEC ", "EXECUTE ", "EXECUTE IMMEDIATE", "INVOKE "],
+      "regex": "(?i)\\b(CALL|EXEC|EXECUTE)\\s+\\w+|EXECUTE\\s+IMMEDIATE"
+    },
+    {
+      "id": "no_procedure_udf_definitions",
+      "description": "No stored procedure or UDF definitions (CREATE PROCEDURE, CREATE FUNCTION)",
+      "keywords": ["CREATE PROCEDURE", "CREATE FUNCTION", "CREATE OR REPLACE PROCEDURE", "CREATE OR REPLACE FUNCTION"],
+      "regex": "(?i)\\bCREATE\\s+(OR\\s+REPLACE\\s+)?(PROCEDURE|FUNCTION)\\s+\\w+"
+    },
+    {
+      "id": "no_nondeterministic_functions",
+      "description": "No non-deterministic functions except those explicitly whitelisted",
+      "keywords": ["RAND()", "NEWID()", "UUID()", "SYS_GUID()"],
+      "regex": "(?i)\\b(RAND|NEWID|UUID|SYS_GUID)\\s*\\("
+    },
+    {
+      "id": "no_select_star",
+      "description": "No SELECT * in metric output (must list columns explicitly)",
+      "keywords": ["SELECT *", "SELECT*"],
+      "regex": "(?i)\\bSELECT\\s+\\*\\s+FROM"
+    },
+    {
+      "id": "no_transaction_control",
+      "description": "No transaction control (COMMIT, ROLLBACK, BEGIN)",
+      "keywords": ["COMMIT", "ROLLBACK", "BEGIN TRANSACTION", "START TRANSACTION"],
+      "regex": "(?i)\\b(COMMIT|ROLLBACK|BEGIN\\s+TRANSACTION|START\\s+TRANSACTION)\\b"
+    },
+    {
+      "id": "no_ddl",
+      "description": "No DDL (CREATE TABLE, ALTER, DROP) within the query body used as derived table or custom SQL",
+      "keywords": ["CREATE TABLE", "ALTER TABLE", "DROP TABLE", "CREATE VIEW", "DROP VIEW"],
+      "regex": "(?i)\\b(CREATE|ALTER|DROP)\\s+(TABLE|VIEW|INDEX)"
+    }
+  ],
+  "nondeterministic_function_whitelist": [
+    "CURRENT_DATE",
+    "CURRENT_TIMESTAMP",
+    "GETDATE",
+    "NOW",
+    "SYSDATE",
+    "DATE_TRUNC"
+  ],
+  "parameter_placeholders": {
+    "syntax": ":name",
+    "description": "Named parameters use :name syntax for BI tool binding",
+    "time_filters": {
+      "start_date": ":axi_start_date",
+      "end_date": ":axi_end_date"
+    },
+    "dimension_filters": {
+      "prefix": ":axi_filter_",
+      "description": "Dimension filter for column 'region' is :axi_filter_region"
+    }
+  },
+  "validation": {
+    "no_session_state": true,
+    "no_temp_tables": true,
+    "no_stored_procedures": true,
+    "no_transaction_control": true,
+    "comments_allowed": true,
+    "single_statement_recommended": true
+  }
+}

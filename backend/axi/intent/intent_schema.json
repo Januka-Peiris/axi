@@ -1,0 +1,326 @@
+{
+  "$defs": {
+    "AndFilter": {
+      "description": "Conjunction of filter clauses.",
+      "properties": {
+        "clauses": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/SimpleFilter"
+              },
+              {
+                "$ref": "#/$defs/AndFilter"
+              },
+              {
+                "$ref": "#/$defs/OrFilter"
+              }
+            ]
+          },
+          "title": "Clauses",
+          "type": "array"
+        },
+        "type": {
+          "const": "and",
+          "default": "and",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "clauses"
+      ],
+      "title": "AndFilter",
+      "type": "object"
+    },
+    "JoinStep": {
+      "description": "Single step in a resolved join path: from_entity -> to_entity.",
+      "properties": {
+        "from_column": {
+          "description": "Column on from_entity (usually FK)",
+          "title": "From Column",
+          "type": "string"
+        },
+        "from_entity": {
+          "description": "Entity on the left of the join",
+          "title": "From Entity",
+          "type": "string"
+        },
+        "join_type": {
+          "default": "left",
+          "enum": [
+            "left",
+            "inner",
+            "right",
+            "full"
+          ],
+          "title": "Join Type",
+          "type": "string"
+        },
+        "to_column": {
+          "description": "Column on to_entity (usually PK)",
+          "title": "To Column",
+          "type": "string"
+        },
+        "to_entity": {
+          "description": "Entity on the right of the join",
+          "title": "To Entity",
+          "type": "string"
+        }
+      },
+      "required": [
+        "from_entity",
+        "to_entity",
+        "from_column",
+        "to_column"
+      ],
+      "title": "JoinStep",
+      "type": "object"
+    },
+    "Measure": {
+      "description": "A single measure: output name, source column reference, aggregation.",
+      "properties": {
+        "aggregation": {
+          "enum": [
+            "sum",
+            "count",
+            "avg",
+            "min",
+            "max",
+            "count_distinct"
+          ],
+          "title": "Aggregation",
+          "type": "string"
+        },
+        "column_ref": {
+          "description": "Entity.column or column (warehouse-agnostic)",
+          "title": "Column Ref",
+          "type": "string"
+        },
+        "name": {
+          "description": "Output name of the measure",
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "column_ref",
+        "aggregation"
+      ],
+      "title": "Measure",
+      "type": "object"
+    },
+    "OrFilter": {
+      "description": "Disjunction of filter clauses.",
+      "properties": {
+        "clauses": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/SimpleFilter"
+              },
+              {
+                "$ref": "#/$defs/AndFilter"
+              },
+              {
+                "$ref": "#/$defs/OrFilter"
+              }
+            ]
+          },
+          "title": "Clauses",
+          "type": "array"
+        },
+        "type": {
+          "const": "or",
+          "default": "or",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "clauses"
+      ],
+      "title": "OrFilter",
+      "type": "object"
+    },
+    "SimpleFilter": {
+      "description": "Single predicate: dimension op value.",
+      "properties": {
+        "dimension": {
+          "description": "Column or entity.column reference",
+          "title": "Dimension",
+          "type": "string"
+        },
+        "op": {
+          "enum": [
+            "=",
+            "!=",
+            ">",
+            "<",
+            ">=",
+            "<=",
+            "IN",
+            "NOT IN",
+            "BETWEEN",
+            "LIKE",
+            "IS NULL",
+            "IS NOT NULL"
+          ],
+          "title": "Op",
+          "type": "string"
+        },
+        "type": {
+          "const": "simple",
+          "default": "simple",
+          "title": "Type",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        }
+      },
+      "required": [
+        "dimension",
+        "op"
+      ],
+      "title": "SimpleFilter",
+      "type": "object"
+    },
+    "TimeDimension": {
+      "description": "Optional time dimension with granularity.",
+      "properties": {
+        "column_ref": {
+          "description": "Entity.column or column",
+          "title": "Column Ref",
+          "type": "string"
+        },
+        "granularity": {
+          "anyOf": [
+            {
+              "enum": [
+                "day",
+                "week",
+                "month",
+                "quarter",
+                "year"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Granularity"
+        },
+        "name": {
+          "description": "Output name (e.g. month, week)",
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "column_ref"
+      ],
+      "title": "TimeDimension",
+      "type": "object"
+    }
+  },
+  "description": "Canonical representation of a metric query: warehouse-agnostic, no SQL.\n\n- metric_name / metric_version: identity and versioning for diffing.\n- base_entity: entity the metric is anchored to.\n- grain: ordered list of columns defining the grain (determinism).\n- measures: one or more measures with aggregation type.\n- dimensions: column refs for GROUP BY (sorted for deterministic serialization).\n- time_dimension: optional time axis.\n- filters: typed, composable (AND/OR).\n- join_path: resolved path from base_entity to any other entities needed; not inferred at runtime.",
+  "properties": {
+    "base_entity": {
+      "description": "Entity the metric is anchored to",
+      "title": "Base Entity",
+      "type": "string"
+    },
+    "dimensions": {
+      "description": "Dimension column refs",
+      "items": {
+        "type": "string"
+      },
+      "title": "Dimensions",
+      "type": "array"
+    },
+    "filters": {
+      "description": "Typed, composable filters",
+      "items": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/SimpleFilter"
+          },
+          {
+            "$ref": "#/$defs/AndFilter"
+          },
+          {
+            "$ref": "#/$defs/OrFilter"
+          }
+        ]
+      },
+      "title": "Filters",
+      "type": "array"
+    },
+    "grain": {
+      "description": "Ordered grain columns",
+      "items": {
+        "type": "string"
+      },
+      "title": "Grain",
+      "type": "array"
+    },
+    "join_path": {
+      "description": "Resolved join path; order matters",
+      "items": {
+        "$ref": "#/$defs/JoinStep"
+      },
+      "title": "Join Path",
+      "type": "array"
+    },
+    "measures": {
+      "description": "Measures with aggregation type",
+      "items": {
+        "$ref": "#/$defs/Measure"
+      },
+      "minItems": 1,
+      "title": "Measures",
+      "type": "array"
+    },
+    "metric_name": {
+      "description": "Metric identifier",
+      "title": "Metric Name",
+      "type": "string"
+    },
+    "metric_version": {
+      "default": "1.0",
+      "description": "Version for deterministic diffing",
+      "title": "Metric Version",
+      "type": "string"
+    },
+    "time_dimension": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TimeDimension"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "metric_name",
+    "base_entity",
+    "measures"
+  ],
+  "title": "SemanticIntent",
+  "type": "object"
+}

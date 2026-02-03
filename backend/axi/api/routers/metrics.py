@@ -113,7 +113,11 @@ def list_metrics():
                 COALESCE(m.type, m.metric_type, m.aggregation, 'custom') AS type,
                 m.expression,
                 m.default_dimensions,
-                m.description
+                m.description,
+                COALESCE(m.version, '1.0') AS version,
+                COALESCE(m.status, 'active') AS status,
+                m.deprecation_date,
+                m.replacement_metric
             FROM metrics m
             LEFT JOIN metrics_id_map mi ON mi.metric_name = m.name
             ORDER BY m.entity_name, m.name
@@ -193,7 +197,11 @@ def get_metric(metric_id: str):
                 m.source_model,
                 m.grain,
                 m.created_at,
-                m.updated_at
+                m.updated_at,
+                COALESCE(m.version, '1.0') AS version,
+                COALESCE(m.status, 'active') AS status,
+                m.deprecation_date,
+                m.replacement_metric
             FROM metrics m
             WHERE m.name = ?
             """
@@ -245,6 +253,200 @@ def get_metric(metric_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+def _resolve_metric_name(metric_id: str) -> str:
+    """Resolve metric_id (id or name) to metric name. Raises HTTPException if not found."""
+    indexer = _get_indexer()
+    try:
+        with indexer._get_conn() as conn:
+            _init_metrics_tables(conn)
+            try:
+                metric_id_int = int(metric_id)
+                metric_name = _get_metric_name(conn, metric_id_int)
+                if not metric_name:
+                    raise HTTPException(status_code=404, detail="Metric not found")
+                return metric_name
+            except (ValueError, TypeError):
+                pass
+    except HTTPException:
+        raise
+    return metric_id
+
+
+@router.get("/{metric_id}/versions")
+def list_metric_versions(metric_id: str):
+    """
+    List server-backed version history for a metric (newest first).
+    """
+    metric_name = _resolve_metric_name(metric_id)
+    indexer = _get_indexer()
+    metric = indexer.get_metric(metric_name)
+    if not metric:
+        raise HTTPException(status_code=404, detail="Metric not found")
+    history = indexer.list_metric_version_history(metric_name)
+    return {"metric_name": metric_name, "versions": history}
+
+
+@router.get("/{metric_id}/current")
+def get_metric_current(metric_id: str):
+    """
+    Get current version of a metric (same as GET /api/metrics/{metric_id} with version/status).
+    """
+    return get_metric(metric_id)
+
+
+@router.get("/{metric_id}/intent")
+def get_metric_intent(metric_id: str):
+    """
+    Get the Semantic Intent for a metric (deterministic, JSON-serializable).
+    Includes metric, grain, dimensions, filters, joins. No raw SQL; transparency only.
+    """
+    from axi.intent.builder import build_intent_from_metric
+    metric_name = _resolve_metric_name(metric_id)
+    indexer = _get_indexer()
+    metric = indexer.get_metric(metric_name)
+    if not metric:
+        raise HTTPException(status_code=404, detail="Metric not found")
+    metric_version = metric.get("version") or "1.0"
+    intent = build_intent_from_metric(
+        indexer=indexer,
+        metric_name=metric_name,
+        metric_version=metric_version,
+        dimensions_override=None,
+        filters_override=None,
+        engine=None,
+    )
+    if not intent:
+        raise HTTPException(status_code=404, detail="Metric not found or intent could not be built")
+    return intent.model_dump()
+
+
+@router.get("/{metric_id}/compiled-sql")
+def get_metric_compiled_sql(
+    metric_id: str,
+    warehouse: str = "snowflake",
+):
+    """
+    Get AXI compiled SQL from the metric's Semantic Intent (governed, intent-based).
+    Includes AXI metadata comments; fingerprintable. No execution; transparency only.
+    """
+    from axi.intent.builder import build_intent_from_metric
+    from axi.intent.compiler import compile_metric
+    from axi.exceptions import MetricDisabledError, ContractViolationError
+    metric_name = _resolve_metric_name(metric_id)
+    indexer = _get_indexer()
+    metric = indexer.get_metric(metric_name)
+    if not metric:
+        raise HTTPException(status_code=404, detail="Metric not found")
+    metric_version = metric.get("version") or "1.0"
+    status = (metric.get("status") or "active").strip().lower()
+    
+    try:
+        intent = build_intent_from_metric(
+            indexer=indexer,
+            metric_name=metric_name,
+            metric_version=metric_version,
+            dimensions_override=None,
+            filters_override=None,
+            engine=None,
+        )
+        if not intent:
+            raise HTTPException(status_code=404, detail="Metric not found or intent could not be built")
+        
+        sql = compile_metric(
+            intent=intent,
+            warehouse=warehouse,
+            indexer=indexer,
+            deprecated=(status == "deprecated"),
+            status=status,
+            replacement_metric=metric.get("replacement_metric"),
+            generated_at=None,
+            validate_contract=True,
+            register_fingerprint=False,
+        )
+        return {"sql": sql, "metric_name": metric_name, "version": metric_version, "warehouse": warehouse}
+    except MetricDisabledError as e:
+        raise HTTPException(
+            status_code=410,
+            detail=e.to_dict(),
+        )
+    except ContractViolationError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "CONTRACT_VIOLATION", "message": str(e), "snippet": getattr(e, "context", {}).get("snippet")},
+        )
+
+
+@router.get("/{metric_id}/usage")
+def get_metric_usage(metric_id: str):
+    """
+    Get usage summary for a metric: total count, deprecated access, first_seen, last_seen, by version.
+    """
+    metric_name = _resolve_metric_name(metric_id)
+    indexer = _get_indexer()
+    metric = indexer.get_metric(metric_name)
+    if not metric:
+        raise HTTPException(status_code=404, detail="Metric not found")
+    rows = indexer.list_usage(metric_name=metric_name)
+    if not rows:
+        return {
+            "metric_name": metric_name,
+            "total_usage_count": 0,
+            "total_deprecated_access_count": 0,
+            "first_seen": None,
+            "last_seen": None,
+            "by_version": [],
+        }
+    total_usage = sum(r["usage_count"] for r in rows)
+    total_deprecated = sum(r["deprecated_access_count"] for r in rows)
+    dates = [r["usage_date"] for r in rows]
+    first_seen = min(dates) if dates else None
+    last_seen = max(dates) if dates else None
+    by_version: Dict[str, Dict[str, Any]] = {}
+    for r in rows:
+        v = r["metric_version"]
+        if v not in by_version:
+            by_version[v] = {"version": v, "usage_count": 0, "deprecated_access_count": 0, "first_seen": r["usage_date"], "last_seen": r["usage_date"]}
+        by_version[v]["usage_count"] += r["usage_count"]
+        by_version[v]["deprecated_access_count"] += r["deprecated_access_count"]
+        by_version[v]["first_seen"] = min(by_version[v]["first_seen"], r["usage_date"])
+        by_version[v]["last_seen"] = max(by_version[v]["last_seen"], r["usage_date"])
+    return {
+        "metric_name": metric_name,
+        "total_usage_count": total_usage,
+        "total_deprecated_access_count": total_deprecated,
+        "first_seen": first_seen,
+        "last_seen": last_seen,
+        "by_version": list(by_version.values()),
+    }
+
+
+@router.get("/{metric_id}/usage/timeseries")
+def get_metric_usage_timeseries(
+    metric_id: str,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+):
+    """
+    Get usage timeseries for a metric (daily buckets). Optional date_from / date_to (YYYY-MM-DD).
+    """
+    metric_name = _resolve_metric_name(metric_id)
+    indexer = _get_indexer()
+    metric = indexer.get_metric(metric_name)
+    if not metric:
+        raise HTTPException(status_code=404, detail="Metric not found")
+    rows = indexer.list_usage(metric_name=metric_name, usage_date_from=date_from, usage_date_to=date_to)
+    by_date: Dict[str, Dict[str, int]] = {}
+    for r in rows:
+        d = r["usage_date"]
+        if d not in by_date:
+            by_date[d] = {"date": d, "usage_count": 0, "deprecated_access_count": 0}
+        by_date[d]["usage_count"] += r["usage_count"]
+        by_date[d]["deprecated_access_count"] += r["deprecated_access_count"]
+    series = sorted(by_date.values(), key=lambda x: x["date"])
+    return {"metric_name": metric_name, "series": series}
+
 
 @router.get("/{metric_id}/dependencies")
 def get_metric_dependencies(metric_id: str):

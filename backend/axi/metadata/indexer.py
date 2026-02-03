@@ -9,6 +9,7 @@ import glob
 import time
 import logging
 from contextlib import contextmanager, nullcontext
+from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
 from axi.utils.logging_config import get_logger
 from axi.config.settings import get_settings
@@ -131,10 +132,15 @@ class MetadataIndexer:
             try:
                 result = self.db.fetchall("PRAGMA table_info(metrics)")
                 m_cols = [row[1] for row in result] if result else []
-                if 'entity_name' not in m_cols:
-                    self.db.execute("ALTER TABLE metrics ADD COLUMN entity_name TEXT")
-                if 'dimension_entity_map' not in m_cols:
-                    self.db.execute("ALTER TABLE metrics ADD COLUMN dimension_entity_map TEXT")
+                def _add_col(col_name: str):
+                    if col_name not in m_cols:
+                        self.db.execute(f"ALTER TABLE metrics ADD COLUMN {col_name} TEXT")
+                _add_col("entity_name")
+                _add_col("dimension_entity_map")
+                _add_col("version")
+                _add_col("status")
+                _add_col("deprecation_date")
+                _add_col("replacement_metric")
             except Exception:
                 pass
         
@@ -376,7 +382,56 @@ class MetadataIndexer:
             scanned_at TEXT,
             UNIQUE(name, path)
         )''')
-        
+
+        # Deployed Views (governed semantic views)
+        self.db.execute('''CREATE TABLE IF NOT EXISTS deployed_views (
+            view_name TEXT PRIMARY KEY,
+            metric_name TEXT NOT NULL,
+            metric_version TEXT NOT NULL,
+            schema_name TEXT NOT NULL,
+            deployed_at_utc TEXT NOT NULL,
+            deprecated INTEGER NOT NULL DEFAULT 0,
+            definition_hash TEXT
+        )''')
+        self.db.execute('''CREATE INDEX IF NOT EXISTS idx_deployed_views_metric ON deployed_views(metric_name)''')
+        self.db.execute('''CREATE INDEX IF NOT EXISTS idx_deployed_views_deprecated ON deployed_views(deprecated)''')
+
+        # Query usage tracking: AXI SQL fingerprints (for matching warehouse query logs)
+        self.db.execute('''CREATE TABLE IF NOT EXISTS axi_sql_fingerprints (
+            fingerprint TEXT PRIMARY KEY,
+            metric_name TEXT NOT NULL,
+            metric_version TEXT NOT NULL,
+            deprecated INTEGER NOT NULL DEFAULT 0,
+            first_seen_utc TEXT
+        )''')
+        self.db.execute('''CREATE INDEX IF NOT EXISTS idx_axi_sql_fingerprints_metric ON axi_sql_fingerprints(metric_name)''')
+
+        # Usage aggregation: metric_name, version, date -> counts (no PII)
+        self.db.execute('''CREATE TABLE IF NOT EXISTS metric_usage (
+            metric_name TEXT NOT NULL,
+            metric_version TEXT NOT NULL,
+            usage_date TEXT NOT NULL,
+            usage_count INTEGER NOT NULL DEFAULT 0,
+            deprecated_access_count INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (metric_name, metric_version, usage_date)
+        )''')
+        self.db.execute('''CREATE INDEX IF NOT EXISTS idx_metric_usage_metric ON metric_usage(metric_name)''')
+        self.db.execute('''CREATE INDEX IF NOT EXISTS idx_metric_usage_date ON metric_usage(usage_date)''')
+
+        # Metric version history (append-only; never overwrite)
+        self.db.execute('''CREATE TABLE IF NOT EXISTS metric_version_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            metric_name TEXT NOT NULL,
+            version TEXT NOT NULL,
+            definition_snapshot TEXT NOT NULL,
+            status TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            deprecated_at TEXT,
+            replacement_metric TEXT
+        )''')
+        self.db.execute('''CREATE INDEX IF NOT EXISTS idx_metric_version_history_name ON metric_version_history(metric_name)''')
+        self.db.execute('''CREATE INDEX IF NOT EXISTS idx_metric_version_history_created ON metric_version_history(created_at DESC)''')
+
         # Create indexes for faster lookups
         self.db.execute('''CREATE INDEX IF NOT EXISTS idx_dimensions_name ON dimensions(name)''')
         self.db.execute('''CREATE INDEX IF NOT EXISTS idx_dimensions_entity_name ON dimensions(entity_name)''')
@@ -522,7 +577,12 @@ class MetadataIndexer:
                 # Get entity's model name from pre-loaded map
                 model_name = entity_model_map.get(entity_name) if entity_name else None
 
-                # Insert or replace metric - use adapter's serialize_json for consistency
+                # Versioning: explicit defaults for user-defined metrics
+                metric_version = metric_data.get("version") or "1.0"
+                metric_status = metric_data.get("status") or "active"
+                deprecation_date = metric_data.get("deprecation_date") or None
+                replacement_metric = metric_data.get("replacement_metric") or None
+
                 self.db.insert_or_replace('metrics', {
                     'name': m_name,
                     'expression': expr,
@@ -544,7 +604,11 @@ class MetadataIndexer:
                     'tags': self.db.serialize_json(tags),
                     'description': desc,
                     'entity_name': entity_name,
-                    'dimension_entity_map': self.db.serialize_json(dimension_entity_map)
+                    'dimension_entity_map': self.db.serialize_json(dimension_entity_map),
+                    'version': metric_version,
+                    'status': metric_status,
+                    'deprecation_date': deprecation_date,
+                    'replacement_metric': replacement_metric,
                 })
             except Exception as e:
                 # Log error but continue processing other metrics
@@ -853,6 +917,12 @@ class MetadataIndexer:
             logger.debug(f"Indexing metric {m_name}, grain type: {type(grain)}")
             
             
+            # Versioning: explicit version and status; defaults for new metrics
+            metric_version = metric.get("version") or "1.0"
+            metric_status = metric.get("status") or "active"
+            deprecation_date = metric.get("deprecation_date") or None
+            replacement_metric = metric.get("replacement_metric") or None
+
             self.db.insert_or_replace('metrics', {
                 'name': m_name,
                 'expression': expr,
@@ -873,7 +943,11 @@ class MetadataIndexer:
                 'semi_additive_dimension': sa_dim,
                 'tags': tags_json,
                 'description': desc,
-                'entity_name': entity.get("name", model_name) if entity else model_name
+                'entity_name': entity.get("name", model_name) if entity else model_name,
+                'version': metric_version,
+                'status': metric_status,
+                'deprecation_date': deprecation_date,
+                'replacement_metric': replacement_metric,
             })
 
     def list_metrics(self) -> List[Dict[str, Any]]:
@@ -884,14 +958,22 @@ class MetadataIndexer:
         cols = ['name', 'expression', 'model', 'grain', 'dimensions', 'filters', 'source_table',
                 'metric_type', 'aggregation', 'default_dimensions', 'default_filter', 'time_dimension',
                 'depends_on', 'numerator', 'denominator', 'semi_additive_method', 'semi_additive_dimension',
-                'tags', 'description', 'entity_name', 'dimension_entity_map']
+                'tags', 'description', 'entity_name', 'dimension_entity_map',
+                'version', 'status', 'deprecation_date', 'replacement_metric']
         result = []
         for row in rows:
-            d = dict(zip(cols, row))
+            # Pad row for backwards compatibility (DB may have fewer columns before migration)
+            row_padded = tuple(row) + (None,) * max(0, len(cols) - len(row))
+            d = dict(zip(cols, row_padded))
             # Deserialize JSON fields
             for json_field in ['dimensions', 'filters', 'default_dimensions', 'depends_on', 'tags', 'grain', 'dimension_entity_map']:
                 if json_field in d:
                     d[json_field] = self.db.deserialize_json(d[json_field])
+            # Default versioning fields if missing
+            if d.get('version') is None:
+                d['version'] = '1.0'
+            if d.get('status') is None:
+                d['status'] = 'active'
             result.append(d)
         return result
 
@@ -902,13 +984,72 @@ class MetadataIndexer:
         cols = ['name', 'expression', 'model', 'grain', 'dimensions', 'filters', 'source_table',
                 'metric_type', 'aggregation', 'default_dimensions', 'default_filter', 'time_dimension',
                 'depends_on', 'numerator', 'denominator', 'semi_additive_method', 'semi_additive_dimension',
-                'tags', 'description', 'entity_name', 'dimension_entity_map']
-        d = dict(zip(cols, row))
+                'tags', 'description', 'entity_name', 'dimension_entity_map',
+                'version', 'status', 'deprecation_date', 'replacement_metric']
+        row_padded = tuple(row) + (None,) * max(0, len(cols) - len(row))
+        d = dict(zip(cols, row_padded))
         # Deserialize JSON fields
         for json_field in ['dimensions', 'filters', 'default_dimensions', 'depends_on', 'tags', 'grain', 'dimension_entity_map']:
             if json_field in d:
                 d[json_field] = self.db.deserialize_json(d[json_field])
+        if d.get('version') is None:
+            d['version'] = '1.0'
+        if d.get('status') is None:
+            d['status'] = 'active'
         return d
+
+    def update_metric_version_status(
+        self,
+        name: str,
+        version: Optional[str] = None,
+        status: Optional[str] = None,
+        deprecation_date: Optional[str] = None,
+        replacement_metric: Optional[str] = None,
+    ) -> None:
+        """Update version, status, deprecation_date, or replacement_metric for a metric.
+        Persists a new version record to metric_version_history before updating; never overwrites history.
+        """
+        existing = self.get_metric(name)
+        if not existing:
+            raise ValueError(f"Metric '{name}' not found")
+        updates = []
+        params = []
+        if version is not None:
+            updates.append("version = ?")
+            params.append(version)
+        if status is not None:
+            if status not in ("active", "deprecated", "disabled"):
+                raise ValueError("status must be active, deprecated, or disabled")
+            updates.append("status = ?")
+            params.append(status)
+        if deprecation_date is not None:
+            updates.append("deprecation_date = ?")
+            params.append(deprecation_date)
+        if replacement_metric is not None:
+            updates.append("replacement_metric = ?")
+            params.append(replacement_metric)
+        if not updates:
+            return
+        created_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        record_version = version if version is not None else (existing.get("version") or "1.0")
+        record_status = status if status is not None else (existing.get("status") or "active")
+        deprecated_at_val = None
+        if record_status == "deprecated":
+            deprecated_at_val = deprecation_date or created_at[:10]
+        replacement_val = replacement_metric if replacement_metric is not None else existing.get("replacement_metric")
+        self.append_metric_version_history(
+            metric_name=name,
+            version=record_version,
+            definition_snapshot=existing,
+            status=record_status,
+            created_at=created_at,
+            deprecated_at=deprecated_at_val,
+            replacement_metric=replacement_val,
+        )
+        params.append(name)
+        sql = f"UPDATE metrics SET {', '.join(updates)} WHERE name = ?"
+        self.db.execute(sql, tuple(params))
+        self.db.commit()
 
     def list_models(self) -> List[Dict[str, Any]]:
         with self._get_conn() as conn:
@@ -999,6 +1140,234 @@ class MetadataIndexer:
                 (name, name)
             )
             return [dict(r) for r in c.fetchall()]
+
+    def list_deployed_views(self, deprecated_only: bool = False) -> List[Dict[str, Any]]:
+        """List deployed views. If deprecated_only=True, return only deprecated views."""
+        with self._get_conn() as conn:
+            conn.row_factory = sqlite3.Row
+            c = conn.cursor()
+            if deprecated_only:
+                c.execute(
+                    '''SELECT view_name, metric_name, metric_version, schema_name, deployed_at_utc, deprecated, definition_hash
+                       FROM deployed_views WHERE deprecated = 1 ORDER BY view_name'''
+                )
+            else:
+                c.execute(
+                    '''SELECT view_name, metric_name, metric_version, schema_name, deployed_at_utc, deprecated, definition_hash
+                       FROM deployed_views ORDER BY view_name'''
+                )
+            return [dict(r) for r in c.fetchall()]
+
+    def get_deployed_view(self, view_name: str) -> Optional[Dict[str, Any]]:
+        """Get a single deployed view by view_name."""
+        with self._get_conn() as conn:
+            conn.row_factory = sqlite3.Row
+            c = conn.cursor()
+            c.execute(
+                '''SELECT view_name, metric_name, metric_version, schema_name, deployed_at_utc, deprecated, definition_hash
+                   FROM deployed_views WHERE view_name = ?''',
+                (view_name,)
+            )
+            row = c.fetchone()
+            return dict(row) if row else None
+
+    def record_deployed_view(
+        self,
+        view_name: str,
+        metric_name: str,
+        metric_version: str,
+        schema_name: str,
+        deployed_at_utc: str,
+        deprecated: bool = False,
+        definition_hash: Optional[str] = None,
+    ) -> None:
+        """Record or update deployment state for a view."""
+        with self._get_conn() as conn:
+            c = conn.cursor()
+            c.execute(
+                '''INSERT OR REPLACE INTO deployed_views
+                   (view_name, metric_name, metric_version, schema_name, deployed_at_utc, deprecated, definition_hash)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                (view_name, metric_name, metric_version, schema_name, deployed_at_utc, 1 if deprecated else 0, definition_hash),
+            )
+            conn.commit()
+
+    def mark_view_deprecated(self, view_name: str) -> None:
+        """Mark a deployed view as deprecated."""
+        with self._get_conn() as conn:
+            c = conn.cursor()
+            c.execute('''UPDATE deployed_views SET deprecated = 1 WHERE view_name = ?''', (view_name,))
+            conn.commit()
+
+    def remove_deployed_view(self, view_name: str) -> None:
+        """Remove deployment record for a view (e.g. after DROP)."""
+        with self._get_conn() as conn:
+            c = conn.cursor()
+            c.execute('''DELETE FROM deployed_views WHERE view_name = ?''', (view_name,))
+            conn.commit()
+
+    # --- Query usage tracking (read-only, no PII) ---
+
+    def record_fingerprint(
+        self,
+        fingerprint: str,
+        metric_name: str,
+        metric_version: str,
+        deprecated: bool = False,
+        first_seen_utc: Optional[str] = None,
+    ) -> None:
+        """Register an AXI SQL fingerprint for a metric (used to match warehouse query logs)."""
+        self.db.insert_or_replace("axi_sql_fingerprints", {
+            "fingerprint": fingerprint,
+            "metric_name": metric_name,
+            "metric_version": metric_version,
+            "deprecated": 1 if deprecated else 0,
+            "first_seen_utc": first_seen_utc or "",
+        })
+
+    def get_fingerprint(self, fingerprint: str) -> Optional[Dict[str, Any]]:
+        """Look up metric info by SQL fingerprint. Returns None if unknown."""
+        row = self.db.fetchone(
+            """SELECT fingerprint, metric_name, metric_version, deprecated, first_seen_utc
+               FROM axi_sql_fingerprints WHERE fingerprint = ?""",
+            (fingerprint,),
+        )
+        if not row:
+            return None
+        return {
+            "fingerprint": row[0],
+            "metric_name": row[1],
+            "metric_version": row[2],
+            "deprecated": bool(row[3]),
+            "first_seen_utc": row[4] or None,
+        }
+
+    def increment_usage(
+        self,
+        metric_name: str,
+        metric_version: str,
+        usage_date: str,
+        deprecated_access: bool = False,
+    ) -> None:
+        """Increment usage counts for a metric/version/date (no PII)."""
+        dep_inc = 1 if deprecated_access else 0
+        # SQLite 3.24+ upsert; excluded = row that would have been inserted
+        self.db.execute(
+            """INSERT INTO metric_usage (metric_name, metric_version, usage_date, usage_count, deprecated_access_count)
+               VALUES (?, ?, ?, 1, ?)
+               ON CONFLICT(metric_name, metric_version, usage_date) DO UPDATE SET
+                 usage_count = usage_count + excluded.usage_count,
+                 deprecated_access_count = deprecated_access_count + excluded.deprecated_access_count""",
+            (metric_name, metric_version, usage_date, dep_inc),
+        )
+        self.db.commit()
+
+    def list_usage(
+        self,
+        metric_name: Optional[str] = None,
+        usage_date_from: Optional[str] = None,
+        usage_date_to: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """List usage aggregation rows. Optional filters by metric and date range."""
+        conditions: List[str] = []
+        params: List[Any] = []
+        if metric_name is not None:
+            conditions.append("metric_name = ?")
+            params.append(metric_name)
+        if usage_date_from is not None:
+            conditions.append("usage_date >= ?")
+            params.append(usage_date_from)
+        if usage_date_to is not None:
+            conditions.append("usage_date <= ?")
+            params.append(usage_date_to)
+        where = (" WHERE " + " AND ".join(conditions)) if conditions else ""
+        sql = f"""SELECT metric_name, metric_version, usage_date, usage_count, deprecated_access_count
+                  FROM metric_usage{where} ORDER BY usage_date DESC, metric_name, metric_version"""
+        rows = self.db.fetchall(sql, tuple(params) if params else None)
+        return [
+            {
+                "metric_name": r[0],
+                "metric_version": r[1],
+                "usage_date": r[2],
+                "usage_count": r[3],
+                "deprecated_access_count": r[4],
+            }
+            for r in rows
+        ]
+
+    # --- Metric version history (append-only; never overwrite) ---
+
+    def append_metric_version_history(
+        self,
+        metric_name: str,
+        version: str,
+        definition_snapshot: Dict[str, Any],
+        status: str,
+        created_at: str,
+        deprecated_at: Optional[str] = None,
+        replacement_metric: Optional[str] = None,
+    ) -> None:
+        """Append a version record. Never overwrite history."""
+        snapshot_json = json.dumps(definition_snapshot, sort_keys=True) if definition_snapshot else "{}"
+        self.db.execute(
+            """INSERT INTO metric_version_history
+               (metric_name, version, definition_snapshot, status, created_at, deprecated_at, replacement_metric)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (metric_name, version, snapshot_json, status, created_at, deprecated_at or None, replacement_metric or None),
+        )
+        self.db.commit()
+
+    def list_metric_version_history(self, metric_name: str) -> List[Dict[str, Any]]:
+        """List version history for a metric, newest first."""
+        rows = self.db.fetchall(
+            """SELECT id, metric_name, version, definition_snapshot, status, created_at, deprecated_at, replacement_metric
+               FROM metric_version_history WHERE metric_name = ? ORDER BY created_at DESC, id DESC""",
+            (metric_name,),
+        )
+        result = []
+        for r in rows:
+            snap = r[3]
+            try:
+                snap = self.db.deserialize_json(snap) if hasattr(self.db, "deserialize_json") else json.loads(snap)
+            except (TypeError, ValueError, json.JSONDecodeError):
+                snap = {}
+            result.append({
+                "id": r[0],
+                "metric_name": r[1],
+                "version": r[2],
+                "definition_snapshot": snap,
+                "status": r[4],
+                "created_at": r[5],
+                "deprecated_at": r[6],
+                "replacement_metric": r[7],
+            })
+        return result
+
+    def get_metric_version_record(self, metric_name: str, version: str) -> Optional[Dict[str, Any]]:
+        """Get a specific version record by metric name and version string."""
+        row = self.db.fetchone(
+            """SELECT id, metric_name, version, definition_snapshot, status, created_at, deprecated_at, replacement_metric
+               FROM metric_version_history WHERE metric_name = ? AND version = ?
+               ORDER BY created_at DESC LIMIT 1""",
+            (metric_name, version),
+        )
+        if not row:
+            return None
+        snap = row[3]
+        try:
+            snap = self.db.deserialize_json(snap) if hasattr(self.db, "deserialize_json") else json.loads(snap)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            snap = {}
+        return {
+            "id": row[0],
+            "metric_name": row[1],
+            "version": row[2],
+            "definition_snapshot": snap,
+            "status": row[4],
+            "created_at": row[5],
+            "deprecated_at": row[6],
+            "replacement_metric": row[7],
+        }
 
     def upsert_entity(self, entity: Dict[str, Any]) -> None:
         """

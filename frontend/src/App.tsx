@@ -26,6 +26,7 @@ const GlossaryEntityDetail = lazy(() => import('./pages/glossary/EntityDetail').
 const GlossaryMetricView = lazy(() => import('./pages/glossary/MetricView').then(m => ({ default: m.MetricView })));
 const GlossaryDimensionView = lazy(() => import('./pages/glossary/DimensionView').then(m => ({ default: m.DimensionView })));
 const GlossaryTermView = lazy(() => import('./pages/glossary/GlossaryTermView').then(m => ({ default: m.GlossaryTermView })));
+const RoiPage = lazy(() => import('./pages/RoiPage').then(m => ({ default: m.RoiPage })));
 
 // Use HashRouter for simpler local file execution if needed, but BrowserRouter is fine for Vite
 // Using HashRouter ensures reloading works easily without server config for SPA
@@ -42,6 +43,7 @@ export default function App() {
               <Route path="/metrics" element={<MetricsListPage />} />
               <Route path="/metrics/compare" element={<MetricCompare />} />
               <Route path="/metrics/:metricId" element={<MetricDetailPage />} />
+              <Route path="/roi" element={<RoiPage />} />
               <Route path="/dimensions" element={<DimensionsListPage />} />
               <Route path="/dimensions/:dimensionId" element={<DimensionDetailPage />} />
 

@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import client from '../../../api/client';
 
+export type MetricStatus = 'active' | 'deprecated' | 'disabled';
+
 export interface MetricListItem {
   id: number;
   name: string;
@@ -9,6 +11,10 @@ export interface MetricListItem {
   expression: string;
   default_dimensions: string[] | null | undefined;
   description: string | null;
+  version?: string;
+  status?: MetricStatus;
+  deprecation_date?: string | null;
+  replacement_metric?: string | null;
 }
 
 export const getMetrics = async (): Promise<MetricListItem[]> => {

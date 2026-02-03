@@ -4,6 +4,13 @@
 
 from .store import MetricStore
 from .validator import MetricValidator
+from .versioning import version_compare, is_breaking_change, diff_metrics
 
-__all__ = ["MetricStore", "MetricValidator"]
+__all__ = [
+    "MetricStore",
+    "MetricValidator",
+    "version_compare",
+    "is_breaking_change",
+    "diff_metrics",
+]
 

@@ -241,6 +241,14 @@ class DatabaseConfig(BaseModel):
             return self.db_password.get_secret_value()
         return None
 
+class ContractEnforcementConfig(BaseModel):
+    """Contract enforcement: strict (hard-fail) or warn (emit warnings, allow compile)."""
+    mode: Literal["warn", "strict"] = Field(
+        default="strict",
+        description="strict: violations fail compile/deploy; warn: violations emit warnings but allow compile"
+    )
+
+
 class Config(BaseModel):
     include: PromotionRules = Field(default_factory=PromotionRules)
     exclude: PromotionRules = Field(default_factory=PromotionRules)
@@ -249,6 +257,10 @@ class Config(BaseModel):
     dimensions: DimensionsConfig = Field(default_factory=DimensionsConfig)
     snowflake: Optional[SnowflakeConfig] = None
     database: Optional[DatabaseConfig] = None
+    contract_enforcement: Literal["warn", "strict"] = Field(
+        default="strict",
+        description="Contract enforcement mode: strict (fail on violation) or warn (warn and allow)"
+    )
 
 def _substitute_env_vars(value: Any) -> Any:
     """

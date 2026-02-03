@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, Calendar, Eye, Edit, Trash2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Calendar, Eye, Edit, Trash2, AlertTriangle } from 'lucide-react';
 import {
   useMetric,
   useMetricDimensions,
   useMetricEntities,
   useMetricSample,
+  useMetricVersions,
 } from './api';
 import { useDeleteMetric } from './api/deleteMetric';
 import {
@@ -15,6 +16,9 @@ import {
   GeneratedSqlModal,
   MetricBuilder,
   DeleteConfirmModal,
+  ServerMetricVersionHistory,
+  IntentAndCompiledSqlSection,
+  MetricUsageSection,
 } from './components';
 import { LineageView } from '../../components/LineageView';
 import { Comments } from '../../components/Comments';
@@ -30,6 +34,7 @@ export const MetricDetailPage: React.FC = () => {
   const { data: dimensions, isLoading: dimensionsLoading } = useMetricDimensions(validMetricId);
   const { data: entities, isLoading: entitiesLoading } = useMetricEntities(validMetricId);
   const { data: sample } = useMetricSample(validMetricId);
+  const { data: versionsData, isLoading: versionsLoading } = useMetricVersions(validMetricId);
   const [showSqlModal, setShowSqlModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -91,6 +96,20 @@ export const MetricDetailPage: React.FC = () => {
               <span className="px-3 py-1 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20 text-sm font-bold uppercase tracking-wider">
                 {metric.type}
               </span>
+              <span className="px-2 py-1 rounded border text-xs font-mono text-slate-400 border-white/10">
+                v{metric.version ?? '1.0'}
+              </span>
+              <span
+                className={`px-2 py-1 rounded border text-xs font-medium capitalize ${
+                  metric.status === 'active'
+                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                    : metric.status === 'deprecated'
+                      ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                      : 'bg-red-500/10 text-red-400 border-red-500/20'
+                }`}
+              >
+                {metric.status ?? 'active'}
+              </span>
               {(metric.entity_name || metric.entity) && (
                 <span className="px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-sm font-bold uppercase tracking-wider">
                   {metric.entity_name || metric.entity}
@@ -125,6 +144,33 @@ export const MetricDetailPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Deprecation banner */}
+      {metric.status === 'deprecated' && (
+        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-amber-200 font-medium">This metric is deprecated.</p>
+            {metric.replacement_metric ? (
+              <p className="text-slate-300 text-sm mt-1">
+                Use{' '}
+                <Link
+                  to={`/metrics/${metric.replacement_metric}`}
+                  className="text-cyan-400 hover:underline font-medium"
+                >
+                  {metric.replacement_metric}
+                </Link>
+                instead.
+              </p>
+            ) : (
+              <p className="text-slate-400 text-sm mt-1">No replacement metric specified.</p>
+            )}
+            {metric.deprecation_date && (
+              <p className="text-slate-500 text-xs mt-1">Deprecation date: {metric.deprecation_date}</p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Description */}
       {metric.description && (
         <div className="p-6 rounded-xl bg-[#151821] border border-white/10 relative z-0">
@@ -148,9 +194,10 @@ export const MetricDetailPage: React.FC = () => {
             <button
               onClick={() => setShowSqlModal(true)}
               className="flex items-center gap-2 px-4 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 rounded-lg border border-cyan-500/20 transition-colors"
+              title="Ad-hoc semantic query SQL (from current dimensions/filters)"
             >
               <Eye className="w-4 h-4" />
-              View Generated SQL
+              View generated SQL (ad-hoc)
             </button>
             <button
               onClick={() => setShowDeleteModal(true)}
@@ -163,6 +210,12 @@ export const MetricDetailPage: React.FC = () => {
         </div>
         <MetricExpression expression={metric.expression} />
       </div>
+
+      {/* Intent & governed compiled SQL (read-only; no execution) */}
+      <IntentAndCompiledSqlSection metricId={metric.name} />
+
+      {/* Usage (adoption, version breakdown, deprecated warning) */}
+      <MetricUsageSection metricId={metric.name} />
 
       {/* Lineage View */}
       <div className="p-6 rounded-xl bg-[#151821] border border-white/10">
@@ -273,7 +326,14 @@ export const MetricDetailPage: React.FC = () => {
             )}
           </div>
 
-          {/* Version History */}
+          {/* Server version history */}
+          <ServerMetricVersionHistory
+            versions={versionsData?.versions ?? []}
+            isLoading={versionsLoading}
+            metricName={metric.name}
+          />
+
+          {/* Local snapshots (client-side) */}
           <VersionHistory
             entityType="metric"
             entityId={metric.name}
