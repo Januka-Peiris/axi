@@ -639,7 +639,7 @@ class SemanticQueryEngine:
             Entity name that owns this dimension, or None if not found
         """
         # Check dimension_entity_map first (stored in metric metadata)
-        dim_entity_map = metric.get('dimension_entity_map', {})
+        dim_entity_map = metric.get("dimension_entity_map") or {}
         if dim_name in dim_entity_map:
             return dim_entity_map[dim_name]
 
