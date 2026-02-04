@@ -66,6 +66,15 @@ Every extraction run produces a summary with explicit counts:
 
 Use `--summary <file>` to write machine-readable JSON for CI/CD integration.
 
+## AXI Guarantees
+
+- Invalid metrics never compile.
+- Disabled metrics cannot be queried or deployed.
+- Deprecated metrics remain queryable but emit warnings.
+- All generated SQL complies with the AXI SQL contract.
+- Usage is only recorded for valid, compiled SQL.
+- BI tools consume AXI metrics via governed SQL views.
+
 ## Inferred Semantics
 
 AXI performs limited inference in specific cases. All inferred semantics are:
@@ -143,6 +152,11 @@ axi query --metric <name>       # Generate SQL for a metric
 
 # UI
 axi ui                          # Start Semantic Explorer
+
+# Deploy views (generate DDL, then record state after applying in the warehouse)
+axi deploy views --schema axi > deploy.sql
+# apply deploy.sql in the warehouse
+axi deploy views --schema axi --record-state
 ```
 
 ## SQL Dialect Support
